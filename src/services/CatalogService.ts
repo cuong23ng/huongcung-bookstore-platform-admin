@@ -1,0 +1,332 @@
+import { ApiClient } from '../integrations/ApiClient';
+import { 
+  Book, CreateBookRequest, UpdateBookRequest,
+  Author, CreateAuthorRequest, UpdateAuthorRequest,
+  Translator, CreateTranslatorRequest, UpdateTranslatorRequest,
+  Publisher, CreatePublisherRequest, UpdatePublisherRequest,
+  Genre, CreateGenreRequest, UpdateGenreRequest,
+  ApiResponse 
+} from '../models';
+import { AxiosInstance, AxiosError } from 'axios';
+
+export class CatalogService {
+  private readonly apiFetcher: AxiosInstance;
+
+  private constructor() {
+    this.apiFetcher = ApiClient.create();
+  }
+
+  public static getInstance(): CatalogService {
+    return new CatalogService();
+  }
+
+  // Books
+  public async getAllBooks(): Promise<Book[]> {
+    try {
+      // Backend returns: { data: { books: [...], pagination: {...} }, message?: string, errorCode?: string }
+      const response = await this.apiFetcher.get<any>('/admin/catalog/books');
+      
+      // Check for error code first
+      if (response.data?.errorCode) {
+        throw new Error(response.data.message || 'Failed to fetch books');
+      }
+      
+      // Backend returns data in format: { data: { books: [...], pagination: {...} } }
+      if (response.data?.data) {
+        // Check if data is an object with 'books' property (paginated response)
+        if (typeof response.data.data === 'object' && 'books' in response.data.data) {
+          return response.data.data.books || [];
+        }
+        // Otherwise, data might be directly the array (fallback for non-paginated)
+        if (Array.isArray(response.data.data)) {
+          return response.data.data;
+        }
+      }
+      
+      throw new Error('Invalid response format from server');
+    } catch (error) {
+      throw this.handleError(error, 'Failed to fetch books');
+    }
+  }
+
+  public async createBook(data: CreateBookRequest): Promise<Book> {
+    try {
+      const response = await this.apiFetcher.post<ApiResponse<Book>>('/admin/catalog/books', data);
+      if (response.data.success && response.data.data) {
+        return response.data.data;
+      }
+      throw new Error(response.data.message || 'Failed to create book');
+    } catch (error) {
+      throw this.handleError(error, 'Failed to create book');
+    }
+  }
+
+  public async updateBook(id: number, data: UpdateBookRequest): Promise<Book> {
+    try {
+      const response = await this.apiFetcher.put<ApiResponse<Book>>(`/admin/catalog/books/${id}`, data);
+      if (response.data.success && response.data.data) {
+        return response.data.data;
+      }
+      throw new Error(response.data.message || 'Failed to update book');
+    } catch (error) {
+      throw this.handleError(error, 'Failed to update book');
+    }
+  }
+
+  public async deleteBook(id: number): Promise<void> {
+    try {
+      // Backend returns: { data: null, message?: string, errorCode?: string }
+      const response = await this.apiFetcher.delete<any>(`/admin/catalog/books/${id}`);
+      if (response.data?.errorCode) {
+        throw new Error(response.data.message || 'Failed to delete book');
+      }
+      // If no errorCode, deletion was successful
+    } catch (error) {
+      throw this.handleError(error, 'Failed to delete book');
+    }
+  }
+
+  // Authors
+  public async getAllAuthors(): Promise<Author[]> {
+    try {
+      // Backend returns: { data: { authors: [...], pagination: {...} } or { data: [...] }, message?: string, errorCode?: string }
+      const response = await this.apiFetcher.get<any>('/admin/catalog/authors');
+      
+      // Check for error code first
+      if (response.data?.errorCode) {
+        throw new Error(response.data.message || 'Failed to fetch authors');
+      }
+      
+      // Backend returns data in format: { data: { authors: [...], pagination: {...} } } or { data: [...] }
+      if (response.data?.data) {
+        // Check if data is an object with 'authors' property (paginated response)
+        if (typeof response.data.data === 'object' && 'authors' in response.data.data) {
+          return response.data.data.authors || [];
+        }
+        // Otherwise, data might be directly the array (fallback for non-paginated)
+        if (Array.isArray(response.data.data)) {
+          return response.data.data;
+        }
+      }
+      
+      throw new Error('Invalid response format from server');
+    } catch (error) {
+      throw this.handleError(error, 'Failed to fetch authors');
+    }
+  }
+
+  public async createAuthor(data: CreateAuthorRequest): Promise<Author> {
+    try {
+      const response = await this.apiFetcher.post<ApiResponse<Author>>('/admin/catalog/authors', data);
+      if (response.data.success && response.data.data) {
+        return response.data.data;
+      }
+      throw new Error(response.data.message || 'Failed to create author');
+    } catch (error) {
+      throw this.handleError(error, 'Failed to create author');
+    }
+  }
+
+  public async updateAuthor(id: number, data: UpdateAuthorRequest): Promise<Author> {
+    try {
+      const response = await this.apiFetcher.put<ApiResponse<Author>>(`/admin/catalog/authors/${id}`, data);
+      if (response.data.success && response.data.data) {
+        return response.data.data;
+      }
+      throw new Error(response.data.message || 'Failed to update author');
+    } catch (error) {
+      throw this.handleError(error, 'Failed to update author');
+    }
+  }
+
+  public async deleteAuthor(id: number): Promise<void> {
+    try {
+      // Backend returns: { data: null, message?: string, errorCode?: string }
+      const response = await this.apiFetcher.delete<any>(`/admin/catalog/authors/${id}`);
+      if (response.data?.errorCode) {
+        throw new Error(response.data.message || 'Failed to delete author');
+      }
+      // If no errorCode, deletion was successful
+    } catch (error) {
+      throw this.handleError(error, 'Failed to delete author');
+    }
+  }
+
+  // Translators
+  public async getAllTranslators(): Promise<Translator[]> {
+    try {
+      const response = await this.apiFetcher.get<ApiResponse<Translator[]>>('/admin/catalog/translators');
+      if (response.data.success && response.data.data) {
+        return response.data.data;
+      }
+      throw new Error(response.data.message || 'Failed to fetch translators');
+    } catch (error) {
+      throw this.handleError(error, 'Failed to fetch translators');
+    }
+  }
+
+  public async createTranslator(data: CreateTranslatorRequest): Promise<Translator> {
+    try {
+      const response = await this.apiFetcher.post<ApiResponse<Translator>>('/admin/catalog/translators', data);
+      if (response.data.success && response.data.data) {
+        return response.data.data;
+      }
+      throw new Error(response.data.message || 'Failed to create translator');
+    } catch (error) {
+      throw this.handleError(error, 'Failed to create translator');
+    }
+  }
+
+  public async updateTranslator(id: number, data: UpdateTranslatorRequest): Promise<Translator> {
+    try {
+      const response = await this.apiFetcher.put<ApiResponse<Translator>>(`/admin/catalog/translators/${id}`, data);
+      if (response.data.success && response.data.data) {
+        return response.data.data;
+      }
+      throw new Error(response.data.message || 'Failed to update translator');
+    } catch (error) {
+      throw this.handleError(error, 'Failed to update translator');
+    }
+  }
+
+  public async deleteTranslator(id: number): Promise<void> {
+    try {
+      const response = await this.apiFetcher.delete<ApiResponse<null>>(`/admin/catalog/translators/${id}`);
+      if (!response.data.success) {
+        throw new Error(response.data.message || 'Failed to delete translator');
+      }
+    } catch (error) {
+      throw this.handleError(error, 'Failed to delete translator');
+    }
+  }
+
+  // Publishers
+  public async getAllPublishers(): Promise<Publisher[]> {
+    try {
+      const response = await this.apiFetcher.get<ApiResponse<Publisher[]>>('/admin/catalog/publishers');
+      if (response.data.success && response.data.data) {
+        return response.data.data;
+      }
+      throw new Error(response.data.message || 'Failed to fetch publishers');
+    } catch (error) {
+      throw this.handleError(error, 'Failed to fetch publishers');
+    }
+  }
+
+  public async createPublisher(data: CreatePublisherRequest): Promise<Publisher> {
+    try {
+      const response = await this.apiFetcher.post<ApiResponse<Publisher>>('/admin/catalog/publishers', data);
+      if (response.data.success && response.data.data) {
+        return response.data.data;
+      }
+      throw new Error(response.data.message || 'Failed to create publisher');
+    } catch (error) {
+      throw this.handleError(error, 'Failed to create publisher');
+    }
+  }
+
+  public async updatePublisher(id: number, data: UpdatePublisherRequest): Promise<Publisher> {
+    try {
+      const response = await this.apiFetcher.put<ApiResponse<Publisher>>(`/admin/catalog/publishers/${id}`, data);
+      if (response.data.success && response.data.data) {
+        return response.data.data;
+      }
+      throw new Error(response.data.message || 'Failed to update publisher');
+    } catch (error) {
+      throw this.handleError(error, 'Failed to update publisher');
+    }
+  }
+
+  public async deletePublisher(id: number): Promise<void> {
+    try {
+      const response = await this.apiFetcher.delete<ApiResponse<null>>(`/admin/catalog/publishers/${id}`);
+      if (!response.data.success) {
+        throw new Error(response.data.message || 'Failed to delete publisher');
+      }
+    } catch (error) {
+      throw this.handleError(error, 'Failed to delete publisher');
+    }
+  }
+
+  // Genres
+  public async getAllGenres(): Promise<Genre[]> {
+    try {
+      // Backend returns: { data: { genres: [...], pagination: {...} } or { data: [...] }, message?: string, errorCode?: string }
+      const response = await this.apiFetcher.get<any>('/admin/catalog/genres');
+      
+      // Check for error code first
+      if (response.data?.errorCode) {
+        throw new Error(response.data.message || 'Failed to fetch genres');
+      }
+      
+      // Backend returns data in format: { data: { genres: [...], pagination: {...} } } or { data: [...] }
+      if (response.data?.data) {
+        // Check if data is an object with 'genres' property (paginated response)
+        if (typeof response.data.data === 'object' && 'genres' in response.data.data) {
+          return response.data.data.genres || [];
+        }
+        // Otherwise, data might be directly the array (fallback for non-paginated)
+        if (Array.isArray(response.data.data)) {
+          return response.data.data;
+        }
+      }
+      
+      throw new Error('Invalid response format from server');
+    } catch (error) {
+      throw this.handleError(error, 'Failed to fetch genres');
+    }
+  }
+
+  public async createGenre(data: CreateGenreRequest): Promise<Genre> {
+    try {
+      const response = await this.apiFetcher.post<ApiResponse<Genre>>('/admin/catalog/genres', data);
+      if (response.data.success && response.data.data) {
+        return response.data.data;
+      }
+      throw new Error(response.data.message || 'Failed to create genre');
+    } catch (error) {
+      throw this.handleError(error, 'Failed to create genre');
+    }
+  }
+
+  public async updateGenre(id: number, data: UpdateGenreRequest): Promise<Genre> {
+    try {
+      const response = await this.apiFetcher.put<ApiResponse<Genre>>(`/admin/catalog/genres/${id}`, data);
+      if (response.data.success && response.data.data) {
+        return response.data.data;
+      }
+      throw new Error(response.data.message || 'Failed to update genre');
+    } catch (error) {
+      throw this.handleError(error, 'Failed to update genre');
+    }
+  }
+
+  public async deleteGenre(id: number): Promise<void> {
+    try {
+      // Backend returns: { data: null, message?: string, errorCode?: string }
+      const response = await this.apiFetcher.delete<any>(`/admin/catalog/genres/${id}`);
+      if (response.data?.errorCode) {
+        throw new Error(response.data.message || 'Failed to delete genre');
+      }
+      // If no errorCode, deletion was successful
+    } catch (error) {
+      throw this.handleError(error, 'Failed to delete genre');
+    }
+  }
+
+  private handleError(error: unknown, defaultMessage: string): Error {
+    if (error instanceof AxiosError) {
+      const errorMessage = 
+        (error.response?.data as any)?.error?.message ||
+        (error.response?.data as any)?.message ||
+        error.message ||
+        defaultMessage;
+      return new Error(errorMessage);
+    }
+    if (error instanceof Error) {
+      return error;
+    }
+    return new Error(defaultMessage);
+  }
+}
+

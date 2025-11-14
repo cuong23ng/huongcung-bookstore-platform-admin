@@ -1,0 +1,33 @@
+/* Background color versions */
+.background-color-olive { background-color: hsl(75, 40%, 50%); }
+.background-color-navy { background-color: hsl(220, 35%, 37%); }
+.background-color-sage { background-color: hsl(140, 30%, 50%); }
+.background-color-terracotta { background-color: hsl(15, 60%, 55%); }
+.background-color-gold { background-color: hsl(40, 43%, 60%); }
+.background-color-ivory { background-color: hsl(50, 30%, 94%); }
+.background-color-mint { background-color: hsl(150, 40%, 70%); }
+.background-color-teal { background-color: hsl(180, 40%, 45%); }
+.background-color-lavender { background-color: hsl(260, 35%, 75%); }
+.background-color-rose { background-color: hsl(330, 45%, 70%); }
+.background-color-brown { background-color: hsl(25, 7%, 45%); }
+.background-color-charcoal { background-color: hsl(210, 15%, 20%); }
+.background-color-fuchsia { background-color: hsl(300, 55%, 60%); }
+.background-color-sea { background-color: hsl(200, 30%, 65%); }
+.background-color-lime { background-color: hsl(100, 60%, 60%); }
+
+/* Text color versions */
+.text-color-olive { color: hsl(75, 40%, 50%); }
+.text-color-navy { color: hsl(220, 39%, 45%); }
+.text-color-sage { color: hsl(140, 30%, 50%); }
+.text-color-terracotta { color: hsl(15, 60%, 55%); }
+.text-color-gold { color: hsl(40, 43%, 60%); }
+.text-color-ivory { color: hsl(50, 13%, 59%); }
+.text-color-mint { color: hsl(150, 40%, 70%); }
+.text-color-teal { color: hsl(180, 40%, 45%); }
+.text-color-lavender { color: hsl(260, 35%, 75%); }
+.text-color-rose { color: hsl(330, 45%, 70%); }
+.text-color-brown { color: hsl(25, 9%, 49%); }
+.text-color-charcoal { color: hsl(210, 27%, 44%); }
+.text-color-fuchsia { color: hsl(300, 55%, 60%); }
+.text-color-sea { color: hsl(200, 28%, 61%); }
+.text-color-lime { color: hsl(100, 60%, 60%); }
