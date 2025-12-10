@@ -1,13 +1,21 @@
 import { ApiClient } from '../integrations/ApiClient';
-import { 
+import type { 
   Book, CreateBookRequest, UpdateBookRequest,
   Author, CreateAuthorRequest, UpdateAuthorRequest,
   Translator, CreateTranslatorRequest, UpdateTranslatorRequest,
   Publisher, CreatePublisherRequest, UpdatePublisherRequest,
   Genre, CreateGenreRequest, UpdateGenreRequest,
-  ApiResponse 
+  ApiResponse,
+  BaseResponse,
+  GetBookCatalogPageResponse,
+  GetAuthorPageResponse,
+  GetGenrePageResponse,
+  GetPublisherPageResponse,
+  GetTranslatorPageResponse,
+  BookDetail
 } from '../models';
-import { AxiosInstance, AxiosError } from 'axios';
+import type { AxiosInstance } from 'axios';
+import { AxiosError } from 'axios';
 
 export class CatalogService {
   private readonly apiFetcher: AxiosInstance;
@@ -24,7 +32,7 @@ export class CatalogService {
   public async getAllBooks(): Promise<Book[]> {
     try {
       // Backend returns: { data: { books: [...], pagination: {...} }, message?: string, errorCode?: string }
-      const response = await this.apiFetcher.get<any>('/admin/catalog/books');
+      const response = await this.apiFetcher.get<BaseResponse<GetBookCatalogPageResponse>>('/admin/catalog/books');
       
       // Check for error code first
       if (response.data?.errorCode) {
@@ -39,7 +47,7 @@ export class CatalogService {
         }
         // Otherwise, data might be directly the array (fallback for non-paginated)
         if (Array.isArray(response.data.data)) {
-          return response.data.data;
+        return response.data.data;
         }
       }
       
@@ -73,10 +81,30 @@ export class CatalogService {
     }
   }
 
+  public async getBookById(id: number): Promise<BookDetail> {
+    try {
+      const response = await this.apiFetcher.get<BaseResponse<BookDetail>>(`/admin/catalog/books/${id}`);
+      
+      // Check for error code first
+      if (response.data?.errorCode) {
+        throw new Error(response.data.message || 'Failed to fetch book');
+      }
+      
+      // Backend returns data in format: { data: BookDetailDTO }
+      if (response.data?.data) {
+        return response.data.data;
+      }
+      
+      throw new Error('Invalid response format from server');
+    } catch (error) {
+      throw this.handleError(error, 'Failed to fetch book');
+    }
+  }
+
   public async deleteBook(id: number): Promise<void> {
     try {
       // Backend returns: { data: null, message?: string, errorCode?: string }
-      const response = await this.apiFetcher.delete<any>(`/admin/catalog/books/${id}`);
+      const response = await this.apiFetcher.delete<BaseResponse<null>>(`/admin/catalog/books/${id}`);
       if (response.data?.errorCode) {
         throw new Error(response.data.message || 'Failed to delete book');
       }
@@ -90,7 +118,7 @@ export class CatalogService {
   public async getAllAuthors(): Promise<Author[]> {
     try {
       // Backend returns: { data: { authors: [...], pagination: {...} } or { data: [...] }, message?: string, errorCode?: string }
-      const response = await this.apiFetcher.get<any>('/admin/catalog/authors');
+      const response = await this.apiFetcher.get<BaseResponse<GetAuthorPageResponse | Author[]>>('/admin/catalog/books/authors');
       
       // Check for error code first
       if (response.data?.errorCode) {
@@ -101,7 +129,7 @@ export class CatalogService {
       if (response.data?.data) {
         // Check if data is an object with 'authors' property (paginated response)
         if (typeof response.data.data === 'object' && 'authors' in response.data.data) {
-          return response.data.data.authors || [];
+          return (response.data.data as GetAuthorPageResponse).authors || [];
         }
         // Otherwise, data might be directly the array (fallback for non-paginated)
         if (Array.isArray(response.data.data)) {
@@ -117,7 +145,7 @@ export class CatalogService {
 
   public async createAuthor(data: CreateAuthorRequest): Promise<Author> {
     try {
-      const response = await this.apiFetcher.post<ApiResponse<Author>>('/admin/catalog/authors', data);
+      const response = await this.apiFetcher.post<ApiResponse<Author>>('/admin/catalog/books/authors', data);
       if (response.data.success && response.data.data) {
         return response.data.data;
       }
@@ -129,7 +157,7 @@ export class CatalogService {
 
   public async updateAuthor(id: number, data: UpdateAuthorRequest): Promise<Author> {
     try {
-      const response = await this.apiFetcher.put<ApiResponse<Author>>(`/admin/catalog/authors/${id}`, data);
+      const response = await this.apiFetcher.put<ApiResponse<Author>>(`/admin/catalog/books/authors/${id}`, data);
       if (response.data.success && response.data.data) {
         return response.data.data;
       }
@@ -142,7 +170,7 @@ export class CatalogService {
   public async deleteAuthor(id: number): Promise<void> {
     try {
       // Backend returns: { data: null, message?: string, errorCode?: string }
-      const response = await this.apiFetcher.delete<any>(`/admin/catalog/authors/${id}`);
+      const response = await this.apiFetcher.delete<BaseResponse<null>>(`/admin/catalog/books/authors/${id}`);
       if (response.data?.errorCode) {
         throw new Error(response.data.message || 'Failed to delete author');
       }
@@ -155,11 +183,27 @@ export class CatalogService {
   // Translators
   public async getAllTranslators(): Promise<Translator[]> {
     try {
-      const response = await this.apiFetcher.get<ApiResponse<Translator[]>>('/admin/catalog/translators');
-      if (response.data.success && response.data.data) {
-        return response.data.data;
+      // Backend returns: { data: { translators: [...], pagination: {...} } or { data: [...] }, message?: string, errorCode?: string }
+      const response = await this.apiFetcher.get<BaseResponse<GetTranslatorPageResponse | Translator[]>>('/admin/catalog/books/translators');
+      
+      // Check for error code first
+      if (response.data?.errorCode) {
+        throw new Error(response.data.message || 'Failed to fetch translators');
       }
-      throw new Error(response.data.message || 'Failed to fetch translators');
+      
+      // Backend returns data in format: { data: { translators: [...], pagination: {...} } } or { data: [...] }
+      if (response.data?.data) {
+        // Check if data is an object with 'translators' property (paginated response)
+        if (typeof response.data.data === 'object' && 'translators' in response.data.data) {
+          return (response.data.data as GetTranslatorPageResponse).translators || [];
+        }
+        // Otherwise, data might be directly the array (fallback for non-paginated)
+        if (Array.isArray(response.data.data)) {
+          return response.data.data;
+        }
+      }
+      
+      throw new Error('Invalid response format from server');
     } catch (error) {
       throw this.handleError(error, 'Failed to fetch translators');
     }
@@ -203,11 +247,27 @@ export class CatalogService {
   // Publishers
   public async getAllPublishers(): Promise<Publisher[]> {
     try {
-      const response = await this.apiFetcher.get<ApiResponse<Publisher[]>>('/admin/catalog/publishers');
-      if (response.data.success && response.data.data) {
-        return response.data.data;
+      // Backend returns: { data: { publishers: [...], pagination: {...} } or { data: [...] }, message?: string, errorCode?: string }
+      const response = await this.apiFetcher.get<BaseResponse<GetPublisherPageResponse | Publisher[]>>('/admin/catalog/books/publishers');
+      
+      // Check for error code first
+      if (response.data?.errorCode) {
+        throw new Error(response.data.message || 'Failed to fetch publishers');
       }
-      throw new Error(response.data.message || 'Failed to fetch publishers');
+      
+      // Backend returns data in format: { data: { publishers: [...], pagination: {...} } } or { data: [...] }
+      if (response.data?.data) {
+        // Check if data is an object with 'publishers' property (paginated response)
+        if (typeof response.data.data === 'object' && 'publishers' in response.data.data) {
+          return (response.data.data as GetPublisherPageResponse).publishers || [];
+        }
+        // Otherwise, data might be directly the array (fallback for non-paginated)
+        if (Array.isArray(response.data.data)) {
+          return response.data.data;
+        }
+      }
+      
+      throw new Error('Invalid response format from server');
     } catch (error) {
       throw this.handleError(error, 'Failed to fetch publishers');
     }
@@ -252,7 +312,7 @@ export class CatalogService {
   public async getAllGenres(): Promise<Genre[]> {
     try {
       // Backend returns: { data: { genres: [...], pagination: {...} } or { data: [...] }, message?: string, errorCode?: string }
-      const response = await this.apiFetcher.get<any>('/admin/catalog/genres');
+      const response = await this.apiFetcher.get<BaseResponse<GetGenrePageResponse | Genre[]>>('/admin/catalog/books/genres');
       
       // Check for error code first
       if (response.data?.errorCode) {
@@ -263,7 +323,7 @@ export class CatalogService {
       if (response.data?.data) {
         // Check if data is an object with 'genres' property (paginated response)
         if (typeof response.data.data === 'object' && 'genres' in response.data.data) {
-          return response.data.data.genres || [];
+          return (response.data.data as GetGenrePageResponse).genres || [];
         }
         // Otherwise, data might be directly the array (fallback for non-paginated)
         if (Array.isArray(response.data.data)) {
@@ -279,7 +339,7 @@ export class CatalogService {
 
   public async createGenre(data: CreateGenreRequest): Promise<Genre> {
     try {
-      const response = await this.apiFetcher.post<ApiResponse<Genre>>('/admin/catalog/genres', data);
+      const response = await this.apiFetcher.post<ApiResponse<Genre>>('/admin/catalog/books/genres', data);
       if (response.data.success && response.data.data) {
         return response.data.data;
       }
@@ -291,7 +351,7 @@ export class CatalogService {
 
   public async updateGenre(id: number, data: UpdateGenreRequest): Promise<Genre> {
     try {
-      const response = await this.apiFetcher.put<ApiResponse<Genre>>(`/admin/catalog/genres/${id}`, data);
+      const response = await this.apiFetcher.put<ApiResponse<Genre>>(`/admin/catalog/books/genres/${id}`, data);
       if (response.data.success && response.data.data) {
         return response.data.data;
       }
@@ -304,7 +364,7 @@ export class CatalogService {
   public async deleteGenre(id: number): Promise<void> {
     try {
       // Backend returns: { data: null, message?: string, errorCode?: string }
-      const response = await this.apiFetcher.delete<any>(`/admin/catalog/genres/${id}`);
+      const response = await this.apiFetcher.delete<BaseResponse<null>>(`/admin/catalog/books/genres/${id}`);
       if (response.data?.errorCode) {
         throw new Error(response.data.message || 'Failed to delete genre');
       }

@@ -28,11 +28,17 @@ export default function OrderFulfillment() {
 
   const userInfo = getAuthData();
   // Normalize role: remove ROLE_ prefix if present and convert to lowercase
-  let userRole = '';
+  let userRole: 'admin' | 'store_manager' = 'store_manager';
   if (userInfo?.roles && userInfo.roles.length > 0) {
-    userRole = userInfo.roles[0].toLowerCase().replace(/^role_/, '');
+    const role = userInfo.roles[0].toLowerCase().replace(/^role_/, '');
+    if (role === 'admin' || role === 'store_manager') {
+      userRole = role as 'admin' | 'store_manager';
+    }
   } else if (userInfo?.userType) {
-    userRole = userInfo.userType.toLowerCase();
+    const role = userInfo.userType.toLowerCase();
+    if (role === 'admin' || role === 'store_manager') {
+      userRole = role as 'admin' | 'store_manager';
+    }
   }
   const userCity = userInfo?.city as City | undefined;
 
@@ -58,8 +64,8 @@ export default function OrderFulfillment() {
 
   // Fetch fulfillment queue
   const { data: orders = [], isLoading, error, refetch } = useQuery({
-    queryKey: ['fulfillmentQueue', effectiveCity],
-    queryFn: () => OrderFulfillmentService.getInstance().getFulfillmentQueue(effectiveCity),
+    queryKey: ['fulfillmentQueue', effectiveCity, userRole],
+    queryFn: () => OrderFulfillmentService.getInstance().getFulfillmentQueue(effectiveCity, userRole),
   });
 
   // Fetch consignments for selected order

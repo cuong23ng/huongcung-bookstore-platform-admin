@@ -16,16 +16,40 @@ export interface OrderItem {
 export interface Order {
   id: number;
   orderNumber: string;
-  customerId: number;
+  customerId?: number;
   customerName?: string;
   customerEmail?: string;
   status: OrderStatus;
-  paymentStatus: 'PENDING' | 'PAID' | 'REFUNDED';
+  paymentStatus?: 'PENDING' | 'PAID' | 'REFUNDED';
   totalAmount: number;
   items: OrderItem[];
   shippingAddress?: string;
   createdAt: string;
   updatedAt?: string;
+}
+
+// DTO from backend fulfillment queue endpoint
+export interface FulfillmentQueueOrder {
+  orderId: number;
+  orderNumber: string;
+  customerName?: string;
+  customerEmail?: string;
+  orderDate: string; // LocalDateTime from backend
+  totalAmount: number;
+  itemCount: number;
+  fulfillableItemCount: number;
+  fulfillableItems: FulfillableItem[];
+}
+
+export interface FulfillableItem {
+  entryId: number;
+  bookId: number;
+  bookTitle: string;
+  bookCode?: string;
+  requestedQuantity: number;
+  availableQuantity: number;
+  unitPrice: number;
+  totalPrice: number;
 }
 
 export interface OrderDetails extends Order {
@@ -55,6 +79,26 @@ export interface UpdateConsignmentRequest {
   status: ConsignmentStatus;
   trackingNumber?: string;
 }
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 
 
 

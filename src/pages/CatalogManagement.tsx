@@ -2,17 +2,21 @@ import { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { Button } from "../components/ui/button";
-import { Input } from "../components/ui/input";
-import { Label } from "../components/ui/label";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "../components/ui/card";
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "../components/ui/table";
-import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger } from "../components/ui/dialog";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "../components/ui/tabs";
+import { BookDetailsDialog } from "../components/BookDetailsDialog";
+import { BooksTable } from "../components/catalog/BooksTable";
+import { AuthorsTable } from "../components/catalog/AuthorsTable";
+import { GenresTable } from "../components/catalog/GenresTable";
+import { BookFormDialog } from "../components/catalog/BookFormDialog";
+import { AuthorFormDialog } from "../components/catalog/AuthorFormDialog";
+import { GenreFormDialog } from "../components/catalog/GenreFormDialog";
 import { useToast } from "../hooks/use-toast";
-import { ArrowLeft, Plus, Trash2, Edit } from "lucide-react";
+import { ArrowLeft } from "lucide-react";
 import { CatalogService } from "../services/CatalogService";
-import { AdminAuthService, getAuthData } from "../services/AdminAuthService";
-import type { Book, Author, Genre } from "../models";
+import { ReviewService } from "../services/ReviewService";
+import { getAuthData } from "../services/AdminAuthService";
+import type { CreateBookRequest, Book, Author, Genre, Publisher, Translator, BookImageData, CreateAuthorRequest, CreateGenreRequest, ImageData } from "../models";
 
 export default function CatalogManagement() {
   const navigate = useNavigate();
@@ -20,8 +24,53 @@ export default function CatalogManagement() {
   const queryClient = useQueryClient();
   const [activeTab, setActiveTab] = useState("books");
   const [dialogOpen, setDialogOpen] = useState(false);
-  const [editMode, setEditMode] = useState(false);
-  const [editingId, setEditingId] = useState<number | null>(null);
+  const [authorDialogOpen, setAuthorDialogOpen] = useState(false);
+  const [genreDialogOpen, setGenreDialogOpen] = useState(false);
+  const [bookDetailsDialogOpen, setBookDetailsDialogOpen] = useState(false);
+  const [selectedBookId, setSelectedBookId] = useState<number | null>(null);
+  const [selectedImages, setSelectedImages] = useState<File[]>([]);
+  const [imagePreviews, setImagePreviews] = useState<string[]>([]);
+  
+  // Author form state
+  const [authorFormData, setAuthorFormData] = useState<Partial<CreateAuthorRequest>>({
+    name: "",
+    bio: "",
+    nationality: "",
+    birthDate: "",
+  });
+  const [authorAvatar, setAuthorAvatar] = useState<File | null>(null);
+  const [authorAvatarPreview, setAuthorAvatarPreview] = useState<string | null>(null);
+  
+  // Genre form state
+  const [genreFormData, setGenreFormData] = useState<Partial<CreateGenreRequest>>({
+    name: "",
+    description: "",
+  });
+  
+  // Form state
+  const [formData, setFormData] = useState<Partial<CreateBookRequest>>({
+    title: "",
+    description: "",
+    language: "VIETNAMESE",
+    publicationDate: "",
+    pageCount: undefined,
+    edition: undefined,
+    authorIds: [],
+    translatorIds: [],
+    publisherId: undefined,
+    genreIds: [],
+    hasPhysicalEdition: false,
+    hasElectricEdition: false,
+    isbn: "",
+    eisbn: "",
+    coverType: undefined,
+    weightGrams: undefined,
+    heightCm: undefined,
+    widthCm: undefined,
+    lengthCm: undefined,
+    physicalBookPrice: undefined,
+    ebookPrice: undefined,
+  });
 
   const userInfo = getAuthData();
   // Normalize role: remove ROLE_ prefix if present and convert to lowercase
@@ -50,42 +99,68 @@ export default function CatalogManagement() {
   }, [navigate, toast, userInfo, userRole]);
 
   // Books
-  const { data: books = [], isLoading: isLoadingBooks, error: booksError } = useQuery({
+  const { data: books = [], isLoading: isLoadingBooks, error: booksError, refetch: refetchBooks } = useQuery({
     queryKey: ['books'],
     queryFn: () => CatalogService.getInstance().getAllBooks(),
-    onError: (error: Error) => {
+    enabled: activeTab === 'books',
+  });
+
+  useEffect(() => {
+    if (booksError && !isLoadingBooks) {
       toast({ 
         title: "Lỗi tải danh sách sách", 
-        description: error.message, 
+        description: booksError instanceof Error ? booksError.message : "Có lỗi xảy ra", 
         variant: "destructive" 
       });
-    },
-  });
+    }
+  }, [booksError, isLoadingBooks, toast]);
 
   // Authors
-  const { data: authors = [], isLoading: isLoadingAuthors, error: authorsError } = useQuery({
+  const { data: authors = [], isLoading: isLoadingAuthors, error: authorsError, refetch: refetchAuthors } = useQuery({
     queryKey: ['authors'],
     queryFn: () => CatalogService.getInstance().getAllAuthors(),
-    onError: (error: Error) => {
-      toast({ 
-        title: "Lỗi tải danh sách tác giả", 
-        description: error.message, 
-        variant: "destructive" 
-      });
-    },
+    enabled: activeTab === 'authors' || activeTab === 'books', // Also load when books tab is active (needed for book form)
   });
 
-  // Genres
-  const { data: genres = [], isLoading: isLoadingGenres, error: genresError } = useQuery({
-    queryKey: ['genres'],
-    queryFn: () => CatalogService.getInstance().getAllGenres(),
-    onError: (error: Error) => {
+  useEffect(() => {
+    if (authorsError && !isLoadingAuthors) {
       toast({ 
-        title: "Lỗi tải danh sách thể loại", 
-        description: error.message, 
+        title: "Lỗi tải danh sách tác giả", 
+        description: authorsError instanceof Error ? authorsError.message : "Có lỗi xảy ra", 
         variant: "destructive" 
       });
-    },
+    }
+  }, [authorsError, isLoadingAuthors, toast]);
+
+  // Genres
+  const { data: genres = [], isLoading: isLoadingGenres, error: genresError, refetch: refetchGenres } = useQuery({
+    queryKey: ['genres'],
+    queryFn: () => CatalogService.getInstance().getAllGenres(),
+    enabled: activeTab === 'genres' || activeTab === 'books', // Also load when books tab is active (needed for book form)
+  });
+
+  useEffect(() => {
+    if (genresError && !isLoadingGenres) {
+      toast({ 
+        title: "Lỗi tải danh sách thể loại", 
+        description: genresError instanceof Error ? genresError.message : "Có lỗi xảy ra", 
+        variant: "destructive" 
+      });
+    }
+  }, [genresError, isLoadingGenres, toast]);
+
+  // Publishers (only needed for book form)
+  const { data: publishers = [] } = useQuery({
+    queryKey: ['publishers'],
+    queryFn: () => CatalogService.getInstance().getAllPublishers(),
+    enabled: activeTab === 'books', // Only load when books tab is active (needed for book form)
+  });
+
+  // Translators (only needed for book form)
+  const { data: translators = [], isLoading: isLoadingTranslators } = useQuery({
+    queryKey: ['translators'],
+    queryFn: () => CatalogService.getInstance().getAllTranslators(),
+    enabled: activeTab === 'books', // Only load when books tab is active (needed for book form)
   });
 
   // Delete mutations
@@ -122,6 +197,118 @@ export default function CatalogManagement() {
     },
   });
 
+  // Generate AI Review mutation
+  const generateAiReviewMutation = useMutation({
+    mutationFn: (bookId: number) => ReviewService.getInstance().generateAiReview(bookId),
+    onSuccess: (message) => {
+      toast({ 
+        title: "Yêu cầu đã được tiếp nhận", 
+        description: message,
+        duration: 5000,
+      });
+    },
+    onError: (error: Error) => {
+      toast({ 
+        title: "Lỗi tạo Review AI", 
+        description: error.message, 
+        variant: "destructive" 
+      });
+    },
+  });
+
+
+  const handleViewBookDetails = (bookId: number) => {
+    setSelectedBookId(bookId);
+    setBookDetailsDialogOpen(true);
+  };
+
+  const handleCloseBookDetails = (open: boolean) => {
+    setBookDetailsDialogOpen(open);
+    if (!open) {
+    setSelectedBookId(null);
+    }
+  };
+
+  // Create book mutation
+  const createBookMutation = useMutation({
+    mutationFn: (data: CreateBookRequest) => CatalogService.getInstance().createBook(data),
+    onSuccess: async () => {
+      await queryClient.invalidateQueries({ queryKey: ['books'] });
+      await refetchBooks();
+      toast({ title: "Thêm sách thành công" });
+      setDialogOpen(false);
+      // Reset form
+      setFormData({
+        title: "",
+        description: "",
+        language: "VIETNAMESE",
+        publicationDate: "",
+        pageCount: undefined,
+        edition: undefined,
+        authorIds: [],
+        translatorIds: [],
+        publisherId: undefined,
+        genreIds: [],
+        hasPhysicalEdition: false,
+        hasElectricEdition: false,
+        isbn: "",
+        eisbn: "",
+        coverType: undefined,
+        weightGrams: undefined,
+        heightCm: undefined,
+        widthCm: undefined,
+        lengthCm: undefined,
+        physicalBookPrice: undefined,
+        ebookPrice: undefined,
+      });
+      setSelectedImages([]);
+      setImagePreviews([]);
+    },
+    onError: (error: Error) => {
+      toast({ title: "Lỗi thêm sách", description: error.message, variant: "destructive" });
+    },
+  });
+
+  // Create author mutation
+  const createAuthorMutation = useMutation({
+    mutationFn: (data: CreateAuthorRequest) => CatalogService.getInstance().createAuthor(data),
+    onSuccess: async () => {
+      await queryClient.invalidateQueries({ queryKey: ['authors'] });
+      await refetchAuthors();
+      toast({ title: "Thêm tác giả thành công" });
+      setAuthorDialogOpen(false);
+      setAuthorFormData({
+        name: "",
+        bio: "",
+        nationality: "",
+        birthDate: "",
+      });
+      setAuthorAvatar(null);
+      setAuthorAvatarPreview(null);
+    },
+    onError: (error: Error) => {
+      toast({ title: "Lỗi thêm tác giả", description: error.message, variant: "destructive" });
+    },
+  });
+
+  // Create genre mutation
+  const createGenreMutation = useMutation({
+    mutationFn: (data: CreateGenreRequest) => CatalogService.getInstance().createGenre(data),
+    onSuccess: async () => {
+      await queryClient.invalidateQueries({ queryKey: ['genres'] });
+      await refetchGenres();
+      toast({ title: "Thêm thể loại thành công" });
+      setGenreDialogOpen(false);
+      setGenreFormData({
+        name: "",
+        description: "",
+      });
+    },
+    onError: (error: Error) => {
+      toast({ title: "Lỗi thêm thể loại", description: error.message, variant: "destructive" });
+    },
+  });
+
   const handleDelete = (type: string, id: number, name: string) => {
     if (!confirm(`Bạn có chắc chắn muốn xóa ${name}?`)) return;
     
@@ -136,6 +323,236 @@ export default function CatalogManagement() {
         deleteGenreMutation.mutate(id);
         break;
     }
+  };
+
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    
+    // Validate required fields
+    if (!formData.title || !formData.title.trim()) {
+      toast({ title: "Lỗi", description: "Vui lòng nhập tiêu đề sách", variant: "destructive" });
+      return;
+    }
+    
+    if (!formData.authorIds || formData.authorIds.length === 0) {
+      toast({ title: "Lỗi", description: "Vui lòng chọn ít nhất một tác giả", variant: "destructive" });
+      return;
+    }
+
+    if (!formData.hasPhysicalEdition && !formData.hasElectricEdition) {
+      toast({ title: "Lỗi", description: "Vui lòng chọn ít nhất một loại sách (sách giấy hoặc ebook)", variant: "destructive" });
+      return;
+    }
+
+    // Convert images to base64
+    const images: BookImageData[] = [];
+    if (selectedImages.length > 0) {
+      for (let i = 0; i < selectedImages.length; i++) {
+        const file = selectedImages[i];
+        try {
+          const base64Data = await convertFileToBase64(file);
+          images.push({
+            fileName: file.name,
+            fileType: file.type,
+            base64Data: base64Data,
+            position: i + 1, // Position starts from 1
+          });
+        } catch (error) {
+          toast({ 
+            title: "Lỗi", 
+            description: `Không thể chuyển đổi ảnh ${file.name} sang base64`, 
+            variant: "destructive" 
+          });
+          return;
+        }
+      }
+    }
+
+    const requestData: CreateBookRequest = {
+      title: formData.title.trim(),
+      description: formData.description?.trim() || undefined,
+      language: formData.language || "VIETNAMESE",
+      publicationDate: formData.publicationDate || undefined,
+      pageCount: formData.pageCount ? Number(formData.pageCount) : undefined,
+      edition: formData.edition ? Number(formData.edition) : undefined,
+      authorIds: formData.authorIds || [],
+      translatorIds: formData.translatorIds && formData.translatorIds.length > 0 ? formData.translatorIds : undefined,
+      publisherId: formData.publisherId || undefined,
+      genreIds: formData.genreIds && formData.genreIds.length > 0 ? formData.genreIds : undefined,
+      hasPhysicalEdition: formData.hasPhysicalEdition || false,
+      hasElectricEdition: formData.hasElectricEdition || false,
+      isbn: formData.hasPhysicalEdition && formData.isbn ? formData.isbn.trim() : undefined,
+      eisbn: formData.hasElectricEdition && formData.eisbn ? formData.eisbn.trim() : undefined,
+      coverType: formData.hasPhysicalEdition && formData.coverType ? formData.coverType : undefined,
+      weightGrams: formData.hasPhysicalEdition && formData.weightGrams ? Number(formData.weightGrams) : undefined,
+      heightCm: formData.hasPhysicalEdition && formData.heightCm ? Number(formData.heightCm) : undefined,
+      widthCm: formData.hasPhysicalEdition && formData.widthCm ? Number(formData.widthCm) : undefined,
+      lengthCm: formData.hasPhysicalEdition && formData.lengthCm ? Number(formData.lengthCm) : undefined,
+      physicalBookPrice: formData.hasPhysicalEdition && formData.physicalBookPrice ? Number(formData.physicalBookPrice) : undefined,
+      ebookPrice: formData.hasElectricEdition && formData.ebookPrice ? Number(formData.ebookPrice) : undefined,
+      images: images.length > 0 ? images : undefined,
+    };
+
+    createBookMutation.mutate(requestData);
+  };
+
+  const toggleAuthor = (authorId: number) => {
+    const currentIds = formData.authorIds || [];
+    const newIds = currentIds.includes(authorId)
+      ? currentIds.filter(id => id !== authorId)
+      : [...currentIds, authorId];
+    setFormData({ ...formData, authorIds: newIds });
+  };
+
+  const toggleTranslator = (translatorId: number) => {
+    const currentIds = formData.translatorIds || [];
+    const newIds = currentIds.includes(translatorId)
+      ? currentIds.filter(id => id !== translatorId)
+      : [...currentIds, translatorId];
+    setFormData({ ...formData, translatorIds: newIds });
+  };
+
+  const toggleGenre = (genreId: number) => {
+    const currentIds = formData.genreIds || [];
+    const newIds = currentIds.includes(genreId)
+      ? currentIds.filter(id => id !== genreId)
+      : [...currentIds, genreId];
+    setFormData({ ...formData, genreIds: newIds });
+  };
+
+  const handleImageSelect = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const files = e.target.files;
+    if (!files || files.length === 0) return;
+
+    const newFiles = Array.from(files);
+    const validFiles = newFiles.filter(file => file.type.startsWith('image/'));
+    
+    if (validFiles.length === 0) {
+      toast({ 
+        title: "Lỗi", 
+        description: "Vui lòng chọn file ảnh hợp lệ", 
+        variant: "destructive" 
+      });
+      return;
+    }
+
+    setSelectedImages(prev => [...prev, ...validFiles]);
+
+    // Create previews
+    const newPreviews = await Promise.all(
+      validFiles.map(file => {
+        return new Promise<string>((resolve) => {
+          const reader = new FileReader();
+          reader.onload = (e) => {
+            resolve(e.target?.result as string);
+          };
+          reader.readAsDataURL(file);
+        });
+      })
+    );
+    setImagePreviews(prev => [...prev, ...newPreviews]);
+  };
+
+  const removeImage = (index: number) => {
+    setSelectedImages(prev => prev.filter((_, i) => i !== index));
+    setImagePreviews(prev => prev.filter((_, i) => i !== index));
+  };
+
+  const convertFileToBase64 = (file: File): Promise<string> => {
+    return new Promise((resolve, reject) => {
+      const reader = new FileReader();
+      reader.onload = () => {
+        const result = reader.result as string;
+        // Remove data URL prefix (data:image/jpeg;base64,)
+        const base64 = result.includes(',') ? result.split(',')[1] : result;
+        resolve(base64);
+      };
+      reader.onerror = reject;
+      reader.readAsDataURL(file);
+    });
+  };
+
+  const handleAuthorAvatarSelect = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    if (!file.type.startsWith('image/')) {
+      toast({ 
+        title: "Lỗi", 
+        description: "Vui lòng chọn file ảnh hợp lệ", 
+        variant: "destructive" 
+      });
+      return;
+    }
+
+    setAuthorAvatar(file);
+
+    // Create preview
+    const reader = new FileReader();
+    reader.onload = (e) => {
+      setAuthorAvatarPreview(e.target?.result as string);
+    };
+    reader.readAsDataURL(file);
+  };
+
+  const removeAuthorAvatar = () => {
+    setAuthorAvatar(null);
+    setAuthorAvatarPreview(null);
+  };
+
+  const handleAuthorSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    
+    if (!authorFormData.name || !authorFormData.name.trim()) {
+      toast({ title: "Lỗi", description: "Vui lòng nhập tên tác giả", variant: "destructive" });
+      return;
+    }
+
+    // Convert avatar to base64 if provided
+    let imageData: ImageData | undefined = undefined;
+    if (authorAvatar) {
+      try {
+        const base64Data = await convertFileToBase64(authorAvatar);
+        imageData = {
+          fileName: authorAvatar.name,
+          fileType: authorAvatar.type,
+          base64Data: base64Data,
+        };
+      } catch (error) {
+        toast({ 
+          title: "Lỗi", 
+          description: "Không thể chuyển đổi ảnh sang base64", 
+          variant: "destructive" 
+        });
+        return;
+      }
+    }
+
+    const requestData: CreateAuthorRequest = {
+      name: authorFormData.name.trim(),
+      bio: authorFormData.bio?.trim() || undefined,
+      nationality: authorFormData.nationality?.trim() || undefined,
+      birthDate: authorFormData.birthDate || undefined,
+      image: imageData,
+    };
+
+    createAuthorMutation.mutate(requestData);
+  };
+
+  const handleGenreSubmit = (e: React.FormEvent) => {
+    e.preventDefault();
+    
+    if (!genreFormData.name || !genreFormData.name.trim()) {
+      toast({ title: "Lỗi", description: "Vui lòng nhập tên thể loại", variant: "destructive" });
+      return;
+    }
+
+    const requestData: CreateGenreRequest = {
+      name: genreFormData.name.trim(),
+      description: genreFormData.description?.trim() || undefined,
+    };
+
+    createGenreMutation.mutate(requestData);
   };
 
   return (
@@ -157,141 +574,97 @@ export default function CatalogManagement() {
             <CardDescription>Quản lý sách, tác giả, và thể loại</CardDescription>
           </CardHeader>
           <CardContent>
-            <Tabs value={activeTab} onValueChange={setActiveTab}>
-              <TabsList>
-                <TabsTrigger value="books">Sách</TabsTrigger>
-                <TabsTrigger value="authors">Tác giả</TabsTrigger>
-                <TabsTrigger value="genres">Thể loại</TabsTrigger>
-              </TabsList>
+              <Tabs value={activeTab} onValueChange={setActiveTab}>
+                <TabsList>
+                  <TabsTrigger value="books">Sách</TabsTrigger>
+                  <TabsTrigger value="authors">Tác giả</TabsTrigger>
+                  <TabsTrigger value="genres">Thể loại</TabsTrigger>
+                </TabsList>
 
-              <TabsContent value="books" className="mt-4">
-                {isLoadingBooks ? (
-                  <div className="text-center py-8">Đang tải...</div>
-                ) : booksError ? (
-                  <div className="text-center py-8">
-                    <p className="text-destructive">Lỗi tải danh sách sách</p>
-                    <p className="text-sm text-muted-foreground mt-2">{booksError.message}</p>
-                  </div>
-                ) : books.length === 0 ? (
-                  <div className="text-center py-8">
-                    <p className="text-muted-foreground">Chưa có sách nào</p>
-                  </div>
-                ) : (
-                  <Table>
-                    <TableHeader>
-                      <TableRow>
-                        <TableHead>Tiêu đề</TableHead>
-                        <TableHead>Giá</TableHead>
-                        <TableHead>Loại</TableHead>
-                        <TableHead className="text-right">Thao tác</TableHead>
-                      </TableRow>
-                    </TableHeader>
-                    <TableBody>
-                      {books.map((book) => (
-                        <TableRow key={book.id}>
-                          <TableCell className="font-medium">{book.title || '-'}</TableCell>
-                          <TableCell>{book.price ? book.price.toLocaleString('vi-VN') + ' VNĐ' : '-'}</TableCell>
-                          <TableCell>{book.bookType || '-'}</TableCell>
-                          <TableCell className="text-right">
-                            <Button
-                              variant="ghost"
-                              size="sm"
-                              onClick={() => handleDelete("book", book.id, book.title)}
-                            >
-                              <Trash2 className="h-4 w-4 text-destructive" />
-                            </Button>
-                          </TableCell>
-                        </TableRow>
-                      ))}
-                    </TableBody>
-                  </Table>
-                )}
+                <TabsContent value="books" className="mt-4">
+                  <div className="flex justify-end mb-4">
+                    <BookFormDialog
+                      open={dialogOpen}
+                      onOpenChange={setDialogOpen}
+                      formData={formData}
+                      onFormDataChange={setFormData}
+                      imagePreviews={imagePreviews}
+                      onImageSelect={handleImageSelect}
+                      onImageRemove={removeImage}
+                      authors={authors as Author[]}
+                      isLoadingAuthors={isLoadingAuthors}
+                      translators={translators as Translator[]}
+                      isLoadingTranslators={isLoadingTranslators}
+                      publishers={publishers as Publisher[]}
+                      genres={genres as Genre[]}
+                      isLoadingGenres={isLoadingGenres}
+                      onToggleAuthor={toggleAuthor}
+                      onToggleTranslator={toggleTranslator}
+                      onToggleGenre={toggleGenre}
+                      onSubmit={handleSubmit}
+                      isSubmitting={createBookMutation.isPending}
+                            />
+                          </div>
+                <BooksTable
+                  books={books as Book[]}
+                  isLoading={isLoadingBooks}
+                  error={booksError}
+                  onViewDetails={handleViewBookDetails}
+                  onDelete={(bookId, bookTitle) => handleDelete("book", bookId, bookTitle)}
+                />
               </TabsContent>
 
               <TabsContent value="authors" className="mt-4">
-                {isLoadingAuthors ? (
-                  <div className="text-center py-8">Đang tải...</div>
-                ) : authorsError ? (
-                  <div className="text-center py-8">
-                    <p className="text-destructive">Lỗi tải danh sách tác giả</p>
-                    <p className="text-sm text-muted-foreground mt-2">{authorsError.message}</p>
-                  </div>
-                ) : authors.length === 0 ? (
-                  <div className="text-center py-8">
-                    <p className="text-muted-foreground">Chưa có tác giả nào</p>
-                  </div>
-                ) : (
-                  <Table>
-                    <TableHeader>
-                      <TableRow>
-                        <TableHead>Tên</TableHead>
-                        <TableHead>Quốc tịch</TableHead>
-                        <TableHead className="text-right">Thao tác</TableHead>
-                      </TableRow>
-                    </TableHeader>
-                    <TableBody>
-                      {authors.map((author) => (
-                        <TableRow key={author.id}>
-                          <TableCell className="font-medium">{author.name || '-'}</TableCell>
-                          <TableCell>{author.nationality || "-"}</TableCell>
-                          <TableCell className="text-right">
-                            <Button
-                              variant="ghost"
-                              size="sm"
-                              onClick={() => handleDelete("author", author.id, author.name)}
-                            >
-                              <Trash2 className="h-4 w-4 text-destructive" />
-                            </Button>
-                          </TableCell>
-                        </TableRow>
-                      ))}
-                    </TableBody>
-                  </Table>
-                )}
+                <div className="flex justify-end mb-4">
+                  <AuthorFormDialog
+                    open={authorDialogOpen}
+                    onOpenChange={setAuthorDialogOpen}
+                    formData={authorFormData}
+                    onFormDataChange={setAuthorFormData}
+                    avatar={authorAvatar}
+                    avatarPreview={authorAvatarPreview}
+                    onAvatarSelect={handleAuthorAvatarSelect}
+                    onAvatarRemove={removeAuthorAvatar}
+                    onSubmit={handleAuthorSubmit}
+                    isSubmitting={createAuthorMutation.isPending}
+                          />
+                        </div>
+                <AuthorsTable
+                  authors={authors as Author[]}
+                  isLoading={isLoadingAuthors}
+                  error={authorsError}
+                  onDelete={(authorId, authorName) => handleDelete("author", authorId, authorName)}
+                />
               </TabsContent>
 
               <TabsContent value="genres" className="mt-4">
-                {isLoadingGenres ? (
-                  <div className="text-center py-8">Đang tải...</div>
-                ) : genresError ? (
-                  <div className="text-center py-8">
-                    <p className="text-destructive">Lỗi tải danh sách thể loại</p>
-                    <p className="text-sm text-muted-foreground mt-2">{genresError.message}</p>
-                  </div>
-                ) : genres.length === 0 ? (
-                  <div className="text-center py-8">
-                    <p className="text-muted-foreground">Chưa có thể loại nào</p>
-                  </div>
-                ) : (
-                  <Table>
-                    <TableHeader>
-                      <TableRow>
-                        <TableHead>Tên</TableHead>
-                        <TableHead>Mô tả</TableHead>
-                        <TableHead className="text-right">Thao tác</TableHead>
-                      </TableRow>
-                    </TableHeader>
-                    <TableBody>
-                      {genres.map((genre) => (
-                        <TableRow key={genre.id}>
-                          <TableCell className="font-medium">{genre.name || '-'}</TableCell>
-                          <TableCell>{genre.description || "-"}</TableCell>
-                          <TableCell className="text-right">
-                            <Button
-                              variant="ghost"
-                              size="sm"
-                              onClick={() => handleDelete("genre", genre.id, genre.name)}
-                            >
-                              <Trash2 className="h-4 w-4 text-destructive" />
-                            </Button>
-                          </TableCell>
-                        </TableRow>
-                      ))}
-                    </TableBody>
-                  </Table>
-                )}
+                <div className="flex justify-end mb-4">
+                  <GenreFormDialog
+                    open={genreDialogOpen}
+                    onOpenChange={setGenreDialogOpen}
+                    formData={genreFormData}
+                    onFormDataChange={setGenreFormData}
+                    onSubmit={handleGenreSubmit}
+                    isSubmitting={createGenreMutation.isPending}
+                          />
+                        </div>
+                <GenresTable
+                  genres={genres as Genre[]}
+                  isLoading={isLoadingGenres}
+                  error={genresError}
+                  onDelete={(genreId, genreName) => handleDelete("genre", genreId, genreName)}
+                />
               </TabsContent>
             </Tabs>
+
+            {/* Book Details Dialog */}
+            <BookDetailsDialog
+              open={bookDetailsDialogOpen}
+              onOpenChange={handleCloseBookDetails}
+              bookId={selectedBookId}
+              onGenerateAiReview={(bookId) => generateAiReviewMutation.mutate(bookId)}
+              isGeneratingReview={generateAiReviewMutation.isPending}
+            />
           </CardContent>
         </Card>
       </main>
