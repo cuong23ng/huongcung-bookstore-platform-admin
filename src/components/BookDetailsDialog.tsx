@@ -12,7 +12,7 @@ import {
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from "./ui/dropdown-menu";
-import { Loader2, Sparkles, CheckCircle, XCircle, Edit, Wand2, RefreshCw, ArrowUp, ArrowDown } from "lucide-react";
+import { Loader2, Sparkles, CheckCircle, XCircle, Edit, Wand2, RefreshCw, ArrowUp, ArrowDown, Upload, X, Save } from "lucide-react";
 import { CatalogService } from "../services/CatalogService";
 import { ReviewService } from "../services/ReviewService";
 import { useToast } from "../hooks/use-toast";
@@ -39,6 +39,8 @@ export function BookDetailsDialog({
   const [isEditingReview, setIsEditingReview] = useState(false);
   const [reviewContent, setReviewContent] = useState("");
   const [reviewRating, setReviewRating] = useState<number | undefined>(undefined);
+  const [selectedFiles, setSelectedFiles] = useState<File[]>([]);
+  const [previewUrls, setPreviewUrls] = useState<string[]>([]);
 
   // Fetch book details
   const { data: bookDetails, isLoading: isLoadingBookDetails, refetch: refetchBookDetails } = useQuery({
@@ -185,6 +187,60 @@ export function BookDetailsDialog({
     },
   });
 
+  // Upload images mutation
+  const uploadImagesMutation = useMutation({
+    mutationFn: (files: File[]) => bookId 
+      ? CatalogService.getInstance().uploadBookImages(bookId, files)
+      : Promise.reject(new Error("Book ID is required")),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['bookDetails', bookId] });
+      // Cleanup preview URLs
+      previewUrls.forEach(url => URL.revokeObjectURL(url));
+      setSelectedFiles([]);
+      setPreviewUrls([]);
+      toast({ 
+        title: "Upload ảnh thành công", 
+        description: "Ảnh đã được tải lên thành công",
+      });
+    },
+    onError: (error: Error) => {
+      toast({ 
+        title: "Lỗi upload ảnh", 
+        description: error.message, 
+        variant: "destructive" 
+      });
+    },
+  });
+
+  // Cleanup preview URLs on unmount
+  useEffect(() => {
+    return () => {
+      previewUrls.forEach(url => URL.revokeObjectURL(url));
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  // Delete image mutation
+  const deleteImageMutation = useMutation({
+    mutationFn: (imageId: number) => bookId 
+      ? CatalogService.getInstance().deleteBookImage(bookId, imageId)
+      : Promise.reject(new Error("Book ID is required")),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['bookDetails', bookId] });
+      toast({ 
+        title: "Xóa ảnh thành công", 
+        description: "Ảnh đã được xóa thành công",
+      });
+    },
+    onError: (error: Error) => {
+      toast({ 
+        title: "Lỗi xóa ảnh", 
+        description: error.message, 
+        variant: "destructive" 
+      });
+    },
+  });
+
   const handleRefresh = () => {
     refetchReview();
     refetchBookDetails();
@@ -281,10 +337,61 @@ export function BookDetailsDialog({
               </div>
 
               {/* Images */}
-              {bookDetails.images && bookDetails.images.length > 0 && (
-                <div className="mt-4 pt-4 border-t">
-                  <h4 className="text-md font-semibold mb-3">Ảnh sách</h4>
-                  <div className="grid grid-cols-4 gap-4">
+              <div className="mt-4 pt-4 border-t">
+                <div className="flex items-center justify-between mb-3">
+                  <h4 className="text-md font-semibold">Ảnh sách</h4>
+                  <div className="flex items-center gap-2">
+                    <Input
+                      type="file"
+                      accept="image/*"
+                      multiple
+                      className="hidden"
+                      id="upload-images"
+                      onChange={(e) => {
+                        const files = Array.from(e.target.files || []);
+                        setSelectedFiles(files);
+                        // Create preview URLs
+                        const urls = files.map(file => URL.createObjectURL(file));
+                        setPreviewUrls(urls);
+                      }}
+                    />
+                    <Label htmlFor="upload-images" className="cursor-pointer">
+                      <Button
+                        type="button"
+                        variant="ghost"
+                        size="icon"
+                        asChild
+                        disabled={uploadImagesMutation.isPending}
+                        className="border-0"
+                      >
+                        <span>
+                          <Upload className="h-4 w-4" />
+                        </span>
+                      </Button>
+                    </Label>
+                    {selectedFiles.length > 0 && (
+                      <Button
+                        type="button"
+                        variant="ghost"
+                        size="icon"
+                        onClick={() => uploadImagesMutation.mutate(selectedFiles)}
+                        disabled={uploadImagesMutation.isPending}
+                        className="border-0"
+                        title="Lưu ảnh"
+                      >
+                        {uploadImagesMutation.isPending ? (
+                          <Loader2 className="h-4 w-4 animate-spin" />
+                        ) : (
+                          <Save className="h-4 w-4" />
+                        )}
+                      </Button>
+                    )}
+                  </div>
+                </div>
+                <div className="grid grid-cols-4 gap-4">
+                  {/* Existing images */}
+                  {bookDetails.images && bookDetails.images.length > 0 && (
+                    <>
                     {bookDetails.images.map((image) => {
                       let imageSrc: string | undefined;
                       if (image.url) {
@@ -305,34 +412,107 @@ export function BookDetailsDialog({
                       }
                       
                       return (
-                        <button
-                          key={imageKey}
-                          type="button"
-                          className="relative cursor-pointer hover:opacity-80 transition-opacity focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2 rounded-md"
-                          onClick={() => imageSrc && setSelectedImage({ src: imageSrc, label: imageLabel })}
-                          onKeyDown={(e) => {
-                            if (e.key === 'Enter' || e.key === ' ') {
-                              e.preventDefault();
-                              imageSrc && setSelectedImage({ src: imageSrc, label: imageLabel });
-                            }
-                          }}
-                        >
-                          {imageSrc && (
-                            <img
-                              src={imageSrc}
-                              alt={imageLabel}
-                              className="w-full h-32 object-cover rounded-md border"
-                            />
+                        <div key={imageKey} className="relative group">
+                          <button
+                            type="button"
+                            className="relative w-full cursor-pointer hover:opacity-80 transition-opacity focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2 rounded-md"
+                            onClick={() => imageSrc && setSelectedImage({ src: imageSrc, label: imageLabel })}
+                            onKeyDown={(e) => {
+                              if (e.key === 'Enter' || e.key === ' ') {
+                                e.preventDefault();
+                                imageSrc && setSelectedImage({ src: imageSrc, label: imageLabel });
+                              }
+                            }}
+                          >
+                            {imageSrc && (
+                              <img
+                                src={imageSrc}
+                                alt={imageLabel}
+                                className="w-full h-32 object-cover rounded-md border"
+                              />
+                            )}
+                            <div className="absolute bottom-1 left-1 bg-black/50 text-white text-xs px-2 py-1 rounded">
+                              {imageLabel}
+                            </div>
+                          </button>
+                          {image.id && (
+                            <Button
+                              type="button"
+                              variant="destructive"
+                              size="icon"
+                              className="absolute top-1 right-1 h-6 w-6 opacity-0 group-hover:opacity-100 transition-opacity"
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                if (confirm('Bạn có chắc chắn muốn xóa ảnh này?')) {
+                                  deleteImageMutation.mutate(image.id!);
+                                }
+                              }}
+                              disabled={deleteImageMutation.isPending}
+                            >
+                              {deleteImageMutation.isPending ? (
+                                <Loader2 className="h-3 w-3 animate-spin" />
+                              ) : (
+                                <X className="h-3 w-3" />
+                              )}
+                            </Button>
                           )}
-                          <div className="absolute bottom-1 left-1 bg-black/50 text-white text-xs px-2 py-1 rounded">
-                            {imageLabel}
-                          </div>
-                        </button>
+                        </div>
                       );
                     })}
-                  </div>
+                    </>
+                  )}
+                  {/* Preview selected images - displayed on the right */}
+                  {previewUrls.map((url, index) => {
+                    const previewKey = `preview-${url}-${index}`;
+                    return (
+                    <div key={previewKey} className="relative group">
+                      <button
+                        type="button"
+                        className="relative w-full cursor-pointer hover:opacity-80 transition-opacity focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2 rounded-md"
+                        onClick={() => setSelectedImage({ src: url, label: `Preview ${index + 1}` })}
+                        onKeyDown={(e) => {
+                          if (e.key === 'Enter' || e.key === ' ') {
+                            e.preventDefault();
+                            setSelectedImage({ src: url, label: `Preview ${index + 1}` });
+                          }
+                        }}
+                      >
+                        <img
+                          src={url}
+                          alt={`Preview ${index + 1}`}
+                          className="w-full h-32 object-cover rounded-md border"
+                        />
+                        <div className="absolute bottom-1 left-1 bg-black/50 text-white text-xs px-2 py-1 rounded">
+                          Mới
+                        </div>
+                      </button>
+                      <Button
+                        type="button"
+                        variant="destructive"
+                        size="icon"
+                        className="absolute top-1 right-1 h-6 w-6 opacity-0 group-hover:opacity-100 transition-opacity"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          // Remove from selectedFiles and previewUrls
+                          const newFiles = selectedFiles.filter((_, i) => i !== index);
+                          const newUrls = previewUrls.filter((_, i) => i !== index);
+                          // Revoke the URL being removed
+                          URL.revokeObjectURL(url);
+                          setSelectedFiles(newFiles);
+                          setPreviewUrls(newUrls);
+                        }}
+                        title="Xóa ảnh"
+                      >
+                        <X className="h-3 w-3" />
+                      </Button>
+                    </div>
+                    );
+                  })}
                 </div>
-              )}
+                {(!bookDetails.images || bookDetails.images.length === 0) && previewUrls.length === 0 && (
+                  <p className="text-sm text-muted-foreground">Chưa có ảnh nào. Hãy tải lên ảnh cho cuốn sách này.</p>
+                )}
+              </div>
             </div>
 
             {/* Physical Book Information */}

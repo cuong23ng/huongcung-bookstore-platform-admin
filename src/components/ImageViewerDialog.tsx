@@ -1,4 +1,4 @@
-import { Dialog, DialogContent } from "./ui/dialog";
+import { Dialog, DialogContent, DialogTitle, DialogDescription } from "./ui/dialog";
 import { Button } from "./ui/button";
 import { X } from "lucide-react";
 
@@ -20,6 +20,10 @@ export function ImageViewerDialog({
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="max-h-[90vh] p-0 bg-transparent border-none shadow-none [&>button]:hidden">
+        <DialogTitle className="sr-only">{imageLabel || "Xem ảnh"}</DialogTitle>
+        <DialogDescription className="sr-only">
+          {imageLabel ? `Xem ảnh: ${imageLabel}` : "Xem ảnh đầy đủ"}
+        </DialogDescription>
         <div className="relative">
           <Button
             variant="ghost"

@@ -14,6 +14,7 @@ import StaffManagement from "./pages/StaffManagement";
 import CatalogManagement from "./pages/CatalogManagement";
 import InventoryManagement from "./pages/InventoryManagement";
 import OrderFulfillment from "./pages/OrderFulfillment";
+import ConsignmentManagement from "./pages/ConsignmentManagement";
 import CustomerSupport from "./pages/CustomerSupport";
 
 const queryClient = new QueryClient();
@@ -68,6 +69,14 @@ const App = () => (
                     element={
                       <ProtectedRoute requiredRole={["admin", "store_manager"]}>
                         <OrderFulfillment />
+                      </ProtectedRoute>
+                    } 
+                  />
+                  <Route 
+                    path="/admin/consignments" 
+                    element={
+                      <ProtectedRoute requiredRole={["admin", "store_manager"]}>
+                        <ConsignmentManagement />
                       </ProtectedRoute>
                     } 
                   />

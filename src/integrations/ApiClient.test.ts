@@ -29,7 +29,7 @@ describe('ApiClient', () => {
       const instance = ApiClient.create();
 
       expect(axios.create).toHaveBeenCalledWith({
-        baseURL: 'http://localhost:8082/api',
+        baseURL: 'https://api-dev.huongcungbookstore.com/api',
         headers: {
           'Content-Type': 'application/json',
         },

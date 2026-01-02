@@ -1,4 +1,4 @@
-import { Users, Package, ShoppingCart, HeadsetIcon, LayoutDashboard } from "lucide-react";
+import { Users, Book, Package, ShoppingCart, HeadsetIcon, LayoutDashboard, Truck } from "lucide-react";
 import { NavLink } from "react-router-dom";
 import { getAuthData } from "../services/AdminAuthService";
 
@@ -30,9 +30,10 @@ export function AppSidebar() {
   const items = [
     { title: "Dashboard", url: "/admin/dashboard", icon: LayoutDashboard, roles: ['admin', 'store_manager', 'support_agent'] },
     { title: "Quản lý nhân viên", url: "/admin/staff", icon: Users, roles: ['admin'] },
-    { title: "Quản lý danh mục", url: "/admin/catalog", icon: Package, roles: ['admin'] },
+    { title: "Quản lý danh mục", url: "/admin/catalog", icon: Book, roles: ['admin'] },
     { title: "Quản lý kho", url: "/admin/inventory", icon: Package, roles: ['admin', 'store_manager'] },
     { title: "Xử lý đơn hàng", url: "/admin/orders", icon: ShoppingCart, roles: ['admin', 'store_manager'] },
+    { title: "Quản lý lô hàng", url: "/admin/consignments", icon: Truck, roles: ['admin', 'store_manager'] },
     { title: "Hỗ trợ khách hàng", url: "/admin/support", icon: HeadsetIcon, roles: ['admin', 'support_agent'] },
   ];
 

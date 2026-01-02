@@ -2,30 +2,25 @@ import { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { Button } from "../components/ui/button";
-import { Input } from "../components/ui/input";
 import { Label } from "../components/ui/label";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "../components/ui/card";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "../components/ui/table";
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "../components/ui/dialog";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "../components/ui/select";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "../components/ui/tabs";
+import { Badge } from "../components/ui/badge";
 import { useToast } from "../hooks/use-toast";
-import { ArrowLeft, Package, Truck } from "lucide-react";
+import { ArrowLeft, Package, Loader2 } from "lucide-react";
 import { OrderFulfillmentService } from "../services/OrderFulfillmentService";
-import { AdminAuthService, getAuthData } from "../services/AdminAuthService";
-import type { Order, Consignment, UpdateConsignmentRequest, ConsignmentStatus, City } from "../models";
+import { getAuthData } from "../services/AdminAuthService";
+import type { Order, OrderDetails, City } from "../models";
 
 export default function OrderFulfillment() {
   const navigate = useNavigate();
   const { toast } = useToast();
   const queryClient = useQueryClient();
-  const [selectedOrderId, setSelectedOrderId] = useState<number | null>(null);
-  const [consignmentDialogOpen, setConsignmentDialogOpen] = useState(false);
-  const [editingConsignmentId, setEditingConsignmentId] = useState<number | null>(null);
   
-  // Form state
-  const [status, setStatus] = useState<ConsignmentStatus>("PENDING");
-  const [trackingNumber, setTrackingNumber] = useState("");
-
+  // Get user info first before using in state initialization
   const userInfo = getAuthData();
   // Normalize role: remove ROLE_ prefix if present and convert to lowercase
   let userRole: 'admin' | 'store_manager' = 'store_manager';
@@ -41,6 +36,20 @@ export default function OrderFulfillment() {
     }
   }
   const userCity = userInfo?.city as City | undefined;
+  
+  const [activeTab, setActiveTab] = useState("fulfillment-queue");
+  const [selectedOrderForDetails, setSelectedOrderForDetails] = useState<number | null>(null);
+  const [orderDetailsDialogOpen, setOrderDetailsDialogOpen] = useState(false);
+  
+  // Fulfillment queue pagination
+  const [fulfillmentQueuePage, setFulfillmentQueuePage] = useState(0);
+  const [fulfillmentQueuePageSize] = useState(20);
+  
+  // Orders list filters
+  const [orderStatusFilter, setOrderStatusFilter] = useState<string | undefined>(undefined);
+  const [orderCityFilter, setOrderCityFilter] = useState<City | undefined>(undefined);
+  const [orderPage, setOrderPage] = useState(0);
+  const [orderPageSize] = useState(20);
 
   // Check access
   useEffect(() => {
@@ -62,19 +71,40 @@ export default function OrderFulfillment() {
   // Determine city filter: Store Managers see only their city
   const effectiveCity = userRole === 'store_manager' ? userCity : undefined;
 
-  // Fetch fulfillment queue
-  const { data: orders = [], isLoading, error, refetch } = useQuery({
-    queryKey: ['fulfillmentQueue', effectiveCity, userRole],
-    queryFn: () => OrderFulfillmentService.getInstance().getFulfillmentQueue(effectiveCity, userRole),
+  // Fetch fulfillment queue with pagination
+  const { data: fulfillmentQueueData, isLoading, error, refetch } = useQuery<{ orders: Order[]; pagination: { page: number; size: number; totalElements: number; totalPages: number } }>({
+    queryKey: ['fulfillmentQueue', effectiveCity, userRole, fulfillmentQueuePage, fulfillmentQueuePageSize],
+    queryFn: () => OrderFulfillmentService.getInstance().getFulfillmentQueue(
+      fulfillmentQueuePage,
+      fulfillmentQueuePageSize,
+      effectiveCity,
+      userRole
+    ),
+    enabled: activeTab === 'fulfillment-queue',
+  });
+  
+  const orders = fulfillmentQueueData?.orders || [];
+
+
+  // Fetch all orders
+  const { data: ordersData, isLoading: isLoadingOrders, refetch: refetchOrders } = useQuery<{ orders: Order[]; pagination: { page: number; size: number; totalElements: number; totalPages: number } }>({
+    queryKey: ['allOrders', orderStatusFilter, orderCityFilter, orderPage, orderPageSize],
+    queryFn: () => OrderFulfillmentService.getInstance().getOrders(
+      orderPage,
+      orderPageSize,
+      orderStatusFilter,
+      orderCityFilter
+    ),
+    enabled: activeTab === 'all-orders',
   });
 
-  // Fetch consignments for selected order
-  const { data: consignments = [], refetch: refetchConsignments } = useQuery({
-    queryKey: ['consignments', selectedOrderId],
-    queryFn: () => selectedOrderId 
-      ? OrderFulfillmentService.getInstance().getConsignmentsByOrder(selectedOrderId)
-      : Promise.resolve([]),
-    enabled: !!selectedOrderId,
+  // Fetch order details
+  const { data: orderDetails, isLoading: isLoadingOrderDetails } = useQuery<Order>({
+    queryKey: ['orderDetails', selectedOrderForDetails],
+    queryFn: () => selectedOrderForDetails 
+      ? OrderFulfillmentService.getInstance().getOrderDetails(selectedOrderForDetails)
+      : Promise.resolve({} as Order),
+    enabled: !!selectedOrderForDetails && orderDetailsDialogOpen,
   });
 
   // Create consignments mutation
@@ -88,37 +118,10 @@ export default function OrderFulfillment() {
         title: "Tạo lô hàng thành công",
         description: `Đã tạo ${data.length} lô hàng cho đơn hàng`,
       });
-      if (data[0]?.orderId) {
-        setSelectedOrderId(data[0].orderId);
-        refetchConsignments();
-      }
     },
     onError: (error: Error) => {
       toast({
         title: "Lỗi tạo lô hàng",
-        description: error.message,
-        variant: "destructive",
-      });
-    },
-  });
-
-  // Update consignment mutation
-  const updateConsignmentMutation = useMutation({
-    mutationFn: ({ id, data }: { id: number; data: UpdateConsignmentRequest }) => 
-      OrderFulfillmentService.getInstance().updateConsignmentStatus(id, data),
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['consignments'] });
-      queryClient.invalidateQueries({ queryKey: ['fulfillmentQueue'] });
-      toast({
-        title: "Cập nhật trạng thái thành công",
-        description: "Trạng thái lô hàng đã được cập nhật",
-      });
-      setConsignmentDialogOpen(false);
-      resetForm();
-    },
-    onError: (error: Error) => {
-      toast({
-        title: "Lỗi cập nhật trạng thái",
         description: error.message,
         variant: "destructive",
       });
@@ -130,48 +133,6 @@ export default function OrderFulfillment() {
     createConsignmentsMutation.mutate(orderId);
   };
 
-  const handleUpdateConsignment = async (e: React.FormEvent) => {
-    e.preventDefault();
-
-    if (!editingConsignmentId) return;
-
-    if (status === 'IN_TRANSIT' && !trackingNumber.trim()) {
-      toast({
-        title: "Lỗi xác thực",
-        description: "Vui lòng nhập mã vận đơn khi cập nhật trạng thái 'Đang vận chuyển'",
-        variant: "destructive",
-      });
-      return;
-    }
-
-    const updateData: UpdateConsignmentRequest = {
-      status,
-      trackingNumber: trackingNumber.trim() || undefined,
-    };
-
-    updateConsignmentMutation.mutate({ id: editingConsignmentId, data: updateData });
-  };
-
-  const handleEditConsignment = (consignment: Consignment) => {
-    setEditingConsignmentId(consignment.id);
-    setStatus(consignment.status);
-    setTrackingNumber(consignment.trackingNumber || "");
-    setConsignmentDialogOpen(true);
-  };
-
-  const resetForm = () => {
-    setStatus("PENDING");
-    setTrackingNumber("");
-    setEditingConsignmentId(null);
-  };
-
-  const handleDialogClose = (open: boolean) => {
-    setConsignmentDialogOpen(open);
-    if (!open) {
-      resetForm();
-    }
-  };
-
   const getStatusLabel = (status: string) => {
     switch (status) {
       case "PENDING":
@@ -180,12 +141,37 @@ export default function OrderFulfillment() {
         return "Đã lấy hàng";
       case "IN_TRANSIT":
         return "Đang vận chuyển";
+      case "OUT_FOR_DELIVERY":
+        return "Đang giao hàng";
       case "DELIVERED":
         return "Đã giao hàng";
+      case "FAILED_DELIVERY":
+        return "Giao hàng thất bại";
+      case "RETURNED":
+        return "Đã trả hàng";
       case "CANCELLED":
         return "Đã hủy";
       default:
         return status;
+    }
+  };
+
+  const getStatusBadgeVariant = (status: string): "default" | "secondary" | "destructive" | "outline" => {
+    switch (status) {
+      case "PENDING":
+        return "secondary";
+      case "PICKED_UP":
+      case "IN_TRANSIT":
+      case "OUT_FOR_DELIVERY":
+        return "default";
+      case "DELIVERED":
+        return "default";
+      case "FAILED_DELIVERY":
+      case "RETURNED":
+      case "CANCELLED":
+        return "destructive";
+      default:
+        return "outline";
     }
   };
 
@@ -224,16 +210,31 @@ export default function OrderFulfillment() {
       </header>
 
       <main className="container mx-auto px-4 py-8">
-        <Card>
-          <CardHeader>
-            <CardTitle>Hàng đợi xử lý</CardTitle>
-            <CardDescription>
-              {userRole === 'store_manager' 
-                ? `Đơn hàng tại ${getCityLabel(userCity || '')}` 
-                : 'Tất cả đơn hàng đã xác nhận'}
-            </CardDescription>
-          </CardHeader>
-          <CardContent>
+        <Tabs value={activeTab} onValueChange={(value) => {
+          setActiveTab(value);
+          // Reset pagination when switching tabs
+          if (value === 'fulfillment-queue') {
+            setFulfillmentQueuePage(0);
+          } else if (value === 'all-orders') {
+            setOrderPage(0);
+          }
+        }} className="w-full">
+          <TabsList className="grid w-full grid-cols-2">
+            <TabsTrigger value="fulfillment-queue">Hàng đợi xử lý</TabsTrigger>
+            <TabsTrigger value="all-orders">Tất cả đơn hàng</TabsTrigger>
+          </TabsList>
+
+          <TabsContent value="fulfillment-queue" className="mt-6">
+            <Card>
+              <CardHeader>
+                <CardTitle>Hàng đợi xử lý</CardTitle>
+                <CardDescription>
+                  {userRole === 'store_manager' 
+                    ? `Đơn hàng tại ${getCityLabel(userCity || '')}` 
+                    : 'Tất cả đơn hàng đã xác nhận'}
+                </CardDescription>
+              </CardHeader>
+              <CardContent>
             {isLoading ? (
               <div className="text-center py-8">
                 <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary mx-auto"></div>
@@ -251,148 +252,471 @@ export default function OrderFulfillment() {
                 <p className="text-muted-foreground">Không có đơn hàng nào cần xử lý</p>
               </div>
             ) : (
-              <div className="space-y-6">
-                {orders.map((order) => (
-                  <Card key={order.id}>
-                    <CardHeader>
-                      <div className="flex justify-between items-start">
-                        <div>
-                          <CardTitle className="text-lg">Đơn hàng #{order.orderNumber}</CardTitle>
-                          <CardDescription>
-                            Khách hàng: {order.customerName || order.customerEmail} | 
-                            Tổng tiền: {order.totalAmount.toLocaleString('vi-VN')} VNĐ
-                          </CardDescription>
+              <>
+                <div className="space-y-6">
+                  {orders.map((order) => (
+                    <Card key={order.id}>
+                      <CardHeader>
+                        <div className="flex justify-between items-start">
+                          <div>
+                            <CardTitle className="text-lg">Đơn hàng #{order.orderNumber}</CardTitle>
+                            <CardDescription>
+                              Khách hàng: {order.customerName || order.customerEmail} | 
+                              Tổng tiền: {order.totalAmount.toLocaleString('vi-VN')} VNĐ
+                            </CardDescription>
+                          </div>
+                          <Button
+                            onClick={() => {
+                              setSelectedOrderForDetails(order.id);
+                              setOrderDetailsDialogOpen(true);
+                            }}
+                            variant="outline"
+                          >
+                            Xem chi tiết
+                          </Button>
                         </div>
-                        <Button
-                          onClick={() => {
-                            setSelectedOrderId(order.id);
-                            if (selectedOrderId === order.id) {
-                              setSelectedOrderId(null);
-                            }
-                          }}
-                          variant="outline"
-                        >
-                          {selectedOrderId === order.id ? "Ẩn" : "Xem"} lô hàng
-                        </Button>
-                      </div>
-                    </CardHeader>
-                    <CardContent>
-                      <div className="space-y-2 mb-4">
-                        <p className="text-sm"><strong>Ngày đặt:</strong> {formatDate(order.createdAt)}</p>
-                        <p className="text-sm"><strong>Trạng thái:</strong> {getStatusLabel(order.status)}</p>
-                        <div className="text-sm">
-                          <strong>Sản phẩm:</strong>
-                          <ul className="list-disc list-inside ml-4">
-                            {order.items.map((item, idx) => (
-                              <li key={idx}>
-                                {item.bookTitle} x{item.quantity} - {item.subtotal.toLocaleString('vi-VN')} VNĐ
-                              </li>
-                            ))}
-                          </ul>
-                        </div>
-                      </div>
-                      
-                      {!consignments.length && selectedOrderId === order.id && (
-                        <Button
-                          onClick={() => handleCreateConsignments(order.id)}
-                          disabled={createConsignmentsMutation.isPending}
-                          className="w-full"
-                        >
-                          <Package className="mr-2 h-4 w-4" />
-                          {createConsignmentsMutation.isPending ? "Đang tạo..." : "Tạo lô hàng"}
-                        </Button>
-                      )}
-
-                      {selectedOrderId === order.id && consignments.length > 0 && (
-                        <div className="mt-4">
-                          <h4 className="font-semibold mb-2">Lô hàng:</h4>
-                          <Table>
-                            <TableHeader>
-                              <TableRow>
-                                <TableHead>Kho</TableHead>
-                                <TableHead>Trạng thái</TableHead>
-                                <TableHead>Mã vận đơn</TableHead>
-                                <TableHead>Số lượng sản phẩm</TableHead>
-                                <TableHead className="text-right">Thao tác</TableHead>
-                              </TableRow>
-                            </TableHeader>
-                            <TableBody>
-                              {consignments
-                                .filter(c => c.orderId === order.id)
-                                .map((consignment) => (
-                                <TableRow key={consignment.id}>
-                                  <TableCell>{getCityLabel(consignment.warehouseCity)}</TableCell>
-                                  <TableCell>{getStatusLabel(consignment.status)}</TableCell>
-                                  <TableCell>{consignment.trackingNumber || "-"}</TableCell>
-                                  <TableCell>{consignment.items.length}</TableCell>
-                                  <TableCell className="text-right">
-                                    <Button
-                                      variant="ghost"
-                                      size="sm"
-                                      onClick={() => handleEditConsignment(consignment)}
-                                    >
-                                      <Truck className="h-4 w-4" />
-                                    </Button>
-                                  </TableCell>
-                                </TableRow>
+                      </CardHeader>
+                      <CardContent>
+                        <div className="space-y-2 mb-4">
+                          <p className="text-sm"><strong>Ngày đặt:</strong> {formatDate(order.createdAt)}</p>
+                          <p className="text-sm"><strong>Trạng thái:</strong> {getStatusLabel(order.status)}</p>
+                          <div className="text-sm">
+                            <strong>Sản phẩm:</strong>
+                            <ul className="list-disc list-inside ml-4">
+                              {order.items.map((item, idx) => (
+                                <li key={idx}>
+                                  {item.bookTitle} x{item.quantity} - {item.subtotal.toLocaleString('vi-VN')} VNĐ
+                                </li>
                               ))}
-                            </TableBody>
-                          </Table>
+                            </ul>
+                          </div>
                         </div>
-                      )}
-                    </CardContent>
-                  </Card>
-                ))}
-              </div>
+                        
+                        <div className="flex gap-2 mt-4">
+                          <Button
+                            onClick={() => handleCreateConsignments(order.id)}
+                            disabled={createConsignmentsMutation.isPending}
+                            variant="outline"
+                            className="flex-1"
+                          >
+                            <Package className="mr-2 h-4 w-4" />
+                            {createConsignmentsMutation.isPending ? "Đang tạo..." : "Tạo lô hàng"}
+                          </Button>
+                        </div>
+                      </CardContent>
+                    </Card>
+                  ))}
+                </div>
+
+                {/* Pagination for fulfillment queue */}
+                {fulfillmentQueueData?.pagination && fulfillmentQueueData.pagination.totalPages > 1 && (
+                  <div className="flex items-center justify-between mt-6">
+                    <div className="text-sm text-muted-foreground">
+                      Trang {fulfillmentQueueData.pagination.page + 1} / {fulfillmentQueueData.pagination.totalPages} 
+                      ({fulfillmentQueueData.pagination.totalElements} đơn hàng)
+                    </div>
+                    <div className="flex gap-2">
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={() => setFulfillmentQueuePage(Math.max(0, fulfillmentQueuePage - 1))}
+                        disabled={fulfillmentQueuePage === 0}
+                      >
+                        Trước
+                      </Button>
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={() => setFulfillmentQueuePage(Math.min(fulfillmentQueueData.pagination.totalPages - 1, fulfillmentQueuePage + 1))}
+                        disabled={fulfillmentQueuePage >= fulfillmentQueueData.pagination.totalPages - 1}
+                      >
+                        Sau
+                      </Button>
+                    </div>
+                  </div>
+                )}
+              </>
             )}
           </CardContent>
         </Card>
+          </TabsContent>
 
-        <Dialog open={consignmentDialogOpen} onOpenChange={handleDialogClose}>
-          <DialogContent className="max-w-md">
+          <TabsContent value="all-orders" className="mt-6">
+            <Card>
+              <CardHeader>
+                <CardTitle>Tất cả đơn hàng</CardTitle>
+                <CardDescription>
+                  Xem và quản lý tất cả đơn hàng trong hệ thống
+                </CardDescription>
+              </CardHeader>
+              <CardContent>
+                {/* Filters */}
+                <div className="flex gap-4 mb-6">
+                  {userRole === 'admin' && (
+                    <div className="flex-1">
+                      <Label htmlFor="order-city-filter">Thành phố</Label>
+                      <Select
+                        value={orderCityFilter || 'all'}
+                        onValueChange={(value) => setOrderCityFilter(value === 'all' ? undefined : value as City)}
+                      >
+                        <SelectTrigger id="order-city-filter">
+                          <SelectValue placeholder="Tất cả thành phố" />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="all">Tất cả thành phố</SelectItem>
+                          <SelectItem value="HANOI">Hà Nội</SelectItem>
+                          <SelectItem value="HCMC">TP. Hồ Chí Minh</SelectItem>
+                          <SelectItem value="DANANG">Đà Nẵng</SelectItem>
+                        </SelectContent>
+                      </Select>
+                    </div>
+                  )}
+                  <div className="flex-1">
+                    <Label htmlFor="order-status-filter">Trạng thái</Label>
+                    <Select
+                      value={orderStatusFilter || 'all'}
+                      onValueChange={(value) => setOrderStatusFilter(value === 'all' ? undefined : value)}
+                    >
+                      <SelectTrigger id="order-status-filter">
+                        <SelectValue placeholder="Tất cả trạng thái" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="all">Tất cả trạng thái</SelectItem>
+                        <SelectItem value="PENDING">Chờ xử lý</SelectItem>
+                        <SelectItem value="CONFIRMED">Đã xác nhận</SelectItem>
+                        <SelectItem value="PROCESSING">Đang xử lý</SelectItem>
+                        <SelectItem value="SHIPPED">Đã gửi hàng</SelectItem>
+                        <SelectItem value="DELIVERED">Đã giao hàng</SelectItem>
+                        <SelectItem value="CANCELLED">Đã hủy</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </div>
+                </div>
+
+                {/* Orders Table */}
+                {isLoadingOrders ? (
+                  <div className="text-center py-8">
+                    <Loader2 className="h-8 w-8 animate-spin mx-auto" />
+                    <p className="mt-2 text-muted-foreground">Đang tải...</p>
+                  </div>
+                ) : !ordersData?.orders || ordersData.orders.length === 0 ? (
+                  <div className="text-center py-8">
+                    <p className="text-muted-foreground">Không có đơn hàng nào</p>
+                  </div>
+                ) : (
+                  <>
+                    <Table>
+                      <TableHeader>
+                        <TableRow>
+                          <TableHead>Mã đơn hàng</TableHead>
+                          <TableHead>Khách hàng</TableHead>
+                          <TableHead>Trạng thái</TableHead>
+                          <TableHead>Thanh toán</TableHead>
+                          <TableHead>Số lượng sản phẩm</TableHead>
+                          <TableHead>Tổng tiền</TableHead>
+                          <TableHead>Ngày đặt</TableHead>
+                          <TableHead className="text-right">Thao tác</TableHead>
+                        </TableRow>
+                      </TableHeader>
+                      <TableBody>
+                        {ordersData.orders.map((order) => (
+                          <TableRow key={order.id}>
+                            <TableCell className="font-medium">{order.orderNumber}</TableCell>
+                            <TableCell>
+                              <div>
+                                <div className="font-medium">{order.customerName || '-'}</div>
+                                <div className="text-xs text-muted-foreground">{order.customerEmail || '-'}</div>
+                              </div>
+                            </TableCell>
+                            <TableCell>
+                              <Badge variant={getStatusBadgeVariant(order.status)}>
+                                {getStatusLabel(order.status)}
+                              </Badge>
+                            </TableCell>
+                            <TableCell>
+                              {order.paymentStatus ? (
+                                <Badge variant={order.paymentStatus === 'PAID' ? 'default' : 'secondary'}>
+                                  {order.paymentStatus === 'PAID' ? 'Đã thanh toán' : order.paymentStatus === 'PENDING' ? 'Chờ thanh toán' : 'Đã hoàn tiền'}
+                                </Badge>
+                              ) : '-'}
+                            </TableCell>
+                            <TableCell>{order.items?.length || 0}</TableCell>
+                            <TableCell>{order.totalAmount?.toLocaleString('vi-VN') || 0} VNĐ</TableCell>
+                            <TableCell>{formatDate(order.createdAt)}</TableCell>
+                            <TableCell className="text-right">
+                              <Button
+                                variant="outline"
+                                size="sm"
+                                onClick={() => {
+                                  setSelectedOrderForDetails(order.id);
+                                  setOrderDetailsDialogOpen(true);
+                                }}
+                              >
+                                Xem chi tiết
+                              </Button>
+                            </TableCell>
+                          </TableRow>
+                        ))}
+                      </TableBody>
+                    </Table>
+
+                    {/* Pagination */}
+                    {ordersData.pagination && ordersData.pagination.totalPages > 1 && (
+                      <div className="flex items-center justify-between mt-4">
+                        <div className="text-sm text-muted-foreground">
+                          Trang {ordersData.pagination.page + 1} / {ordersData.pagination.totalPages} 
+                          ({ordersData.pagination.totalElements} đơn hàng)
+                        </div>
+                        <div className="flex gap-2">
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            onClick={() => setOrderPage(Math.max(0, orderPage - 1))}
+                            disabled={orderPage === 0}
+                          >
+                            Trước
+                          </Button>
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            onClick={() => setOrderPage(Math.min(ordersData.pagination.totalPages - 1, orderPage + 1))}
+                            disabled={orderPage >= ordersData.pagination.totalPages - 1}
+                          >
+                            Sau
+                          </Button>
+                        </div>
+                      </div>
+                    )}
+                  </>
+                )}
+              </CardContent>
+            </Card>
+          </TabsContent>
+        </Tabs>
+
+        {/* Order Details Dialog */}
+        <Dialog open={orderDetailsDialogOpen} onOpenChange={setOrderDetailsDialogOpen}>
+          <DialogContent className="max-w-4xl max-h-[90vh] overflow-y-auto">
             <DialogHeader>
-              <DialogTitle>Cập nhật trạng thái lô hàng</DialogTitle>
+              <DialogTitle>Chi tiết đơn hàng</DialogTitle>
               <DialogDescription>
-                Cập nhật trạng thái và mã vận đơn cho lô hàng
+                Thông tin chi tiết về đơn hàng
               </DialogDescription>
             </DialogHeader>
-            <form onSubmit={handleUpdateConsignment} className="space-y-4">
-              <div className="space-y-2">
-                <Label htmlFor="status">Trạng thái *</Label>
-                <Select value={status} onValueChange={(value) => setStatus(value as ConsignmentStatus)} required>
-                  <SelectTrigger>
-                    <SelectValue placeholder="Chọn trạng thái" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="PENDING">Chờ xử lý</SelectItem>
-                    <SelectItem value="PICKED_UP">Đã lấy hàng</SelectItem>
-                    <SelectItem value="IN_TRANSIT">Đang vận chuyển</SelectItem>
-                    <SelectItem value="DELIVERED">Đã giao hàng</SelectItem>
-                  </SelectContent>
-                </Select>
+            {isLoadingOrderDetails ? (
+              <div className="text-center py-8">
+                <Loader2 className="h-8 w-8 animate-spin mx-auto" />
+                <p className="mt-2 text-muted-foreground">Đang tải...</p>
               </div>
-              <div className="space-y-2">
-                <Label htmlFor="trackingNumber">Mã vận đơn</Label>
-                <Input
-                  id="trackingNumber"
-                  value={trackingNumber}
-                  onChange={(e) => setTrackingNumber(e.target.value)}
-                  placeholder="Nhập mã vận đơn (bắt buộc khi 'Đang vận chuyển')"
-                />
-                <p className="text-xs text-muted-foreground">
-                  Bắt buộc khi trạng thái là "Đang vận chuyển"
-                </p>
+            ) : orderDetails ? (
+              <div className="space-y-6">
+                {/* Order Info */}
+                <div className="grid grid-cols-2 gap-4">
+                  <div>
+                    <Label className="text-sm font-medium text-muted-foreground">Mã đơn hàng</Label>
+                    <p className="text-lg font-semibold">{orderDetails.orderNumber}</p>
+                  </div>
+                  <div>
+                    <Label className="text-sm font-medium text-muted-foreground">Trạng thái</Label>
+                    <div className="mt-1">
+                      <Badge variant={getStatusBadgeVariant(orderDetails.status)}>
+                        {getStatusLabel(orderDetails.status)}
+                      </Badge>
+                    </div>
+                  </div>
+                  <div>
+                    <Label className="text-sm font-medium text-muted-foreground">Ngày đặt</Label>
+                    <p>{formatDate(orderDetails.createdAt)}</p>
+                  </div>
+                  <div>
+                    <Label className="text-sm font-medium text-muted-foreground">Thanh toán</Label>
+                    <div className="mt-1">
+                      {orderDetails.paymentStatus ? (
+                        <Badge variant={orderDetails.paymentStatus === 'PAID' ? 'default' : 'secondary'}>
+                          {orderDetails.paymentStatus === 'PAID' ? 'Đã thanh toán' : orderDetails.paymentStatus === 'PENDING' ? 'Chờ thanh toán' : 'Đã hoàn tiền'}
+                        </Badge>
+                      ) : '-'}
+                    </div>
+                  </div>
+                </div>
+
+                {/* Customer Info */}
+                {(orderDetails.customerName || orderDetails.customerEmail) && (
+                  <div>
+                    <Label className="text-sm font-medium text-muted-foreground">Khách hàng</Label>
+                    <div className="mt-1 space-y-1">
+                      {orderDetails.customerName && <p className="font-medium">{orderDetails.customerName}</p>}
+                      {orderDetails.customerEmail && <p className="text-sm text-muted-foreground">{orderDetails.customerEmail}</p>}
+                    </div>
+                  </div>
+                )}
+
+                {/* Shipping Address */}
+                {orderDetails.shippingAddress && (
+                  <div>
+                    <Label className="text-sm font-medium text-muted-foreground">Địa chỉ giao hàng</Label>
+                    <div className="mt-1 space-y-1">
+                      {typeof orderDetails.shippingAddress === 'object' && orderDetails.shippingAddress !== null ? (
+                        <>
+                          {orderDetails.shippingAddress.name && (
+                            <p className="font-medium">{orderDetails.shippingAddress.name}</p>
+                          )}
+                          {orderDetails.shippingAddress.phone && (
+                            <p className="text-sm text-muted-foreground">Điện thoại: {orderDetails.shippingAddress.phone}</p>
+                          )}
+                          {orderDetails.shippingAddress.address && (
+                            <p>{orderDetails.shippingAddress.address}</p>
+                          )}
+                          {(orderDetails.shippingAddress.ward?.wardName || 
+                            orderDetails.shippingAddress.district?.districtName || 
+                            orderDetails.shippingAddress.province?.provinceName) && (
+                            <p className="text-sm text-muted-foreground">
+                              {[
+                                orderDetails.shippingAddress.ward?.wardName,
+                                orderDetails.shippingAddress.district?.districtName,
+                                orderDetails.shippingAddress.province?.provinceName
+                              ].filter(Boolean).join(', ')}
+                            </p>
+                          )}
+                        </>
+                      ) : (
+                        <p>{orderDetails.shippingAddress}</p>
+                      )}
+                    </div>
+                  </div>
+                )}
+
+                {/* Consignments */}
+                {orderDetails.consignments && orderDetails.consignments.length > 0 ? (
+                  <div className="space-y-6">
+                    {orderDetails.consignments.map((consignment) => (
+                      <Card key={consignment.id}>
+                        <CardHeader>
+                          <div className="flex justify-between items-start">
+                            <div>
+                              <CardTitle className="text-lg">Lô hàng: {consignment.code}</CardTitle>
+                              <CardDescription>
+                                Kho: {getCityLabel(consignment.warehouseCity)} | 
+                                Trạng thái: {getStatusLabel(consignment.status)}
+                                {consignment.trackingNumber && ` | Mã vận đơn: ${consignment.trackingNumber}`}
+                              </CardDescription>
+                            </div>
+                            <Badge variant={getStatusBadgeVariant(consignment.status)}>
+                              {getStatusLabel(consignment.status)}
+                            </Badge>
+                          </div>
+                        </CardHeader>
+                        <CardContent>
+                          {/* Consignment Info */}
+                          <div className="grid grid-cols-2 gap-4 mb-4 text-sm">
+                            {consignment.shippingCompany && (
+                              <div>
+                                <Label className="text-xs text-muted-foreground">Đơn vị vận chuyển</Label>
+                                <p>{consignment.shippingCompany}</p>
+                              </div>
+                            )}
+                            {consignment.estimatedDeliveryDate && (
+                              <div>
+                                <Label className="text-xs text-muted-foreground">Ngày dự kiến giao</Label>
+                                <p>{formatDate(consignment.estimatedDeliveryDate)}</p>
+                              </div>
+                            )}
+                            {consignment.actualDeliveryDate && (
+                              <div>
+                                <Label className="text-xs text-muted-foreground">Ngày giao thực tế</Label>
+                                <p>{formatDate(consignment.actualDeliveryDate)}</p>
+                              </div>
+                            )}
+                            <div>
+                              <Label className="text-xs text-muted-foreground">Tổng tiền lô hàng</Label>
+                              <p className="font-semibold">{consignment.totalPrice?.toLocaleString('vi-VN') || 0} VNĐ</p>
+                            </div>
+                          </div>
+
+                          {/* Consignment Items */}
+                          {consignment.entries && consignment.entries.length > 0 && (
+                            <div>
+                              <Label className="text-sm font-medium text-muted-foreground mb-2 block">Sản phẩm trong lô hàng</Label>
+                              <Table>
+                                <TableHeader>
+                                  <TableRow>
+                                    <TableHead>Sản phẩm</TableHead>
+                                    <TableHead>Số lượng</TableHead>
+                                    <TableHead>Đã gửi</TableHead>
+                                    <TableHead>Đơn giá</TableHead>
+                                    <TableHead className="text-right">Thành tiền</TableHead>
+                                  </TableRow>
+                                </TableHeader>
+                                <TableBody>
+                                  {consignment.entries.map((entry) => (
+                                    <TableRow key={entry.id}>
+                                      <TableCell className="font-medium">{entry.bookTitle}</TableCell>
+                                      <TableCell>{entry.quantity}</TableCell>
+                                      <TableCell>{entry.shippedQuantity || 0}</TableCell>
+                                      <TableCell>{entry.unitPrice?.toLocaleString('vi-VN') || 0} VNĐ</TableCell>
+                                      <TableCell className="text-right">{entry.totalPrice?.toLocaleString('vi-VN') || 0} VNĐ</TableCell>
+                                    </TableRow>
+                                  ))}
+                                </TableBody>
+                              </Table>
+                            </div>
+                          )}
+                        </CardContent>
+                      </Card>
+                    ))}
+                  </div>
+                ) : orderDetails.items && orderDetails.items.length > 0 ? (
+                  // Fallback to items if no consignments
+                  <div>
+                    <Label className="text-sm font-medium text-muted-foreground mb-2 block">Sản phẩm</Label>
+                    <Table>
+                      <TableHeader>
+                        <TableRow>
+                          <TableHead>Sản phẩm</TableHead>
+                          <TableHead>Loại</TableHead>
+                          <TableHead>Số lượng</TableHead>
+                          <TableHead>Đơn giá</TableHead>
+                          <TableHead className="text-right">Thành tiền</TableHead>
+                        </TableRow>
+                      </TableHeader>
+                      <TableBody>
+                        {orderDetails.items.map((item) => (
+                          <TableRow key={item.id}>
+                            <TableCell className="font-medium">{item.bookTitle}</TableCell>
+                            <TableCell>
+                              <Badge variant="outline">
+                                {item.itemType === 'PHYSICAL' ? 'Sách giấy' : 'Sách điện tử'}
+                              </Badge>
+                            </TableCell>
+                            <TableCell>{item.quantity}</TableCell>
+                            <TableCell>{item.unitPrice?.toLocaleString('vi-VN') || 0} VNĐ</TableCell>
+                            <TableCell className="text-right">{item.subtotal?.toLocaleString('vi-VN') || 0} VNĐ</TableCell>
+                          </TableRow>
+                        ))}
+                      </TableBody>
+                    </Table>
+                  </div>
+                ) : null}
+
+                {/* Total */}
+                <div className="border-t pt-4">
+                  <div className="flex justify-end">
+                    <div className="space-y-2 text-right">
+                      <div className="text-lg font-semibold">
+                        Tổng tiền: {orderDetails.totalAmount?.toLocaleString('vi-VN') || 0} VNĐ
+                      </div>
+                    </div>
+                  </div>
+                </div>
               </div>
-              <Button 
-                type="submit" 
-                className="w-full" 
-                disabled={updateConsignmentMutation.isPending}
-              >
-                {updateConsignmentMutation.isPending ? "Đang xử lý..." : "Cập nhật"}
-              </Button>
-            </form>
+            ) : (
+              <div className="text-center py-8">
+                <p className="text-muted-foreground">Không tìm thấy thông tin đơn hàng</p>
+              </div>
+            )}
           </DialogContent>
         </Dialog>
+
       </main>
     </div>
   );

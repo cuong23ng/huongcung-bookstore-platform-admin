@@ -48,6 +48,7 @@ export interface CreateBookRequest {
 }
 
 export interface BookImageData {
+  id?: number;
   fileName?: string;
   fileType?: string;
   base64Data?: string;

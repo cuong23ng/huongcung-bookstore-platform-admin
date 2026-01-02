@@ -9,7 +9,7 @@ export class ApiClient {
     }
 
     const instance = axios.create({
-      baseURL: 'http://localhost:8082/api',
+      baseURL: 'https://api-dev.huongcungbookstore.com/api',
       headers: {
         'Content-Type': 'application/json',
       },

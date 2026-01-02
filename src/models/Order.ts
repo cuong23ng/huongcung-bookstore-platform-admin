@@ -1,7 +1,7 @@
 import { City } from './Staff';
 
 export type OrderStatus = 'PENDING' | 'CONFIRMED' | 'PROCESSING' | 'SHIPPED' | 'DELIVERED' | 'CANCELLED';
-export type ConsignmentStatus = 'PENDING' | 'PICKED_UP' | 'IN_TRANSIT' | 'DELIVERED' | 'CANCELLED';
+export type ConsignmentStatus = 'CREATED' | 'PENDING' | 'PICKED_UP' | 'IN_TRANSIT' | 'OUT_FOR_DELIVERY' | 'DELIVERED' | 'FAILED_DELIVERY' | 'RETURNED';
 
 export interface OrderItem {
   id: number;
@@ -52,20 +52,71 @@ export interface FulfillableItem {
   totalPrice: number;
 }
 
+export interface Address {
+  name?: string;
+  phone?: string;
+  address?: string;
+  province?: {
+    provinceId?: string;
+    provinceName?: string;
+  };
+  district?: {
+    districtId?: string;
+    districtName?: string;
+  };
+  ward?: {
+    wardCode?: string;
+    wardName?: string;
+  };
+  postalCode?: string;
+}
+
 export interface OrderDetails extends Order {
   consignments?: Consignment[];
-  shippingAddress: string;
+  shippingAddress?: Address | string; // Can be Address object or string (for backward compatibility)
   phone?: string;
   notes?: string;
+  subtotal?: number;
+  shippingAmount?: number;
+  taxAmount?: number;
+  discountAmount?: number;
+  paymentMethod?: string;
+  orderType?: string;
+  billingAddress?: string;
+}
+
+export interface ConsignmentEntry {
+  id: number;
+  orderEntryId: number;
+  bookId: number;
+  bookTitle: string;
+  bookCode?: string;
+  quantity: number;
+  shippedQuantity: number;
+  unitPrice: number;
+  totalPrice: number;
 }
 
 export interface Consignment {
   id: number;
+  code: string;
   orderId: number;
-  warehouseCity: City;
+  orderNumber: string;
   status: ConsignmentStatus;
   trackingNumber?: string;
-  items: OrderItem[];
+  shippingCompany?: string;
+  estimatedDeliveryDate?: string;
+  actualDeliveryDate?: string;
+  shippingAddress?: string;
+  notes?: string;
+  totalPrice: number;
+  codAmount: number;
+  warehouseCity: City;
+  warehouseId: number;
+  warehouseCode?: string;
+  customerName?: string;
+  customerEmail?: string;
+  entries: ConsignmentEntry[];
   createdAt: string;
   updatedAt?: string;
 }
@@ -78,6 +129,23 @@ export interface CreateConsignmentRequest {
 export interface UpdateConsignmentRequest {
   status: ConsignmentStatus;
   trackingNumber?: string;
+}
+
+export interface ConsignmentShipRequest {
+  status: 'PICKED_UP' | 'IN_TRANSIT';
+  trackingNumber?: string;
+  shippingCompany?: string;
+  estimatedDeliveryDate?: string;
+}
+
+export interface PaginatedConsignmentResponse {
+  consignments: Consignment[];
+  pagination: {
+    page: number;
+    size: number;
+    totalElements: number;
+    totalPages: number;
+  };
 }
 
 

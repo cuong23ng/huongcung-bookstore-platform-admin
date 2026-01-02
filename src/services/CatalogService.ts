@@ -114,6 +114,45 @@ export class CatalogService {
     }
   }
 
+  public async uploadBookImages(id: number, files: File[]): Promise<void> {
+    try {
+      const formData = new FormData();
+      files.forEach((file) => {
+        formData.append('files', file);
+      });
+
+      const response = await this.apiFetcher.post<BaseResponse<null>>(
+        `/admin/catalog/books/${id}/images`,
+        formData,
+        {
+          headers: {
+            'Content-Type': 'multipart/form-data',
+          },
+        }
+      );
+
+      if (response.data?.errorCode) {
+        throw new Error(response.data.message || 'Failed to upload images');
+      }
+    } catch (error) {
+      throw this.handleError(error, 'Failed to upload images');
+    }
+  }
+
+  public async deleteBookImage(bookId: number, imageId: number): Promise<void> {
+    try {
+      const response = await this.apiFetcher.delete<BaseResponse<null>>(
+        `/admin/catalog/books/${bookId}/images/${imageId}`
+      );
+
+      if (response.data?.errorCode) {
+        throw new Error(response.data.message || 'Failed to delete image');
+      }
+    } catch (error) {
+      throw this.handleError(error, 'Failed to delete image');
+    }
+  }
+
   // Authors
   public async getAllAuthors(): Promise<Author[]> {
     try {
