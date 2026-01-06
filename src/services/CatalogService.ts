@@ -5,7 +5,6 @@ import type {
   Translator, CreateTranslatorRequest, UpdateTranslatorRequest,
   Publisher, CreatePublisherRequest, UpdatePublisherRequest,
   Genre, CreateGenreRequest, UpdateGenreRequest,
-  ApiResponse,
   BaseResponse,
   GetBookCatalogPageResponse,
   GetAuthorPageResponse,
@@ -59,11 +58,19 @@ export class CatalogService {
 
   public async createBook(data: CreateBookRequest): Promise<Book> {
     try {
-      const response = await this.apiFetcher.post<ApiResponse<Book>>('/admin/catalog/books', data);
-      if (response.data.success && response.data.data) {
+      const response = await this.apiFetcher.post<BaseResponse<Book>>('/admin/catalog/books', data);
+      // Check for error code first
+      if (response.data?.errorCode) {
+        throw new Error(response.data.message || 'Failed to create book');
+      }
+      // If no errorCode and data exists, return it
+      if (response.data?.data) {
+        console.log(response.data.data);
         return response.data.data;
       }
-      throw new Error(response.data.message || 'Failed to create book');
+      // If no data but no error, book was created successfully (backend may not return data)
+      // We need to refetch the book list or return a placeholder
+      throw new Error(response.data.message || 'Book created but data not returned');
     } catch (error) {
       throw this.handleError(error, 'Failed to create book');
     }
@@ -71,8 +78,13 @@ export class CatalogService {
 
   public async updateBook(id: number, data: UpdateBookRequest): Promise<Book> {
     try {
-      const response = await this.apiFetcher.put<ApiResponse<Book>>(`/admin/catalog/books/${id}`, data);
-      if (response.data.success && response.data.data) {
+      const response = await this.apiFetcher.put<BaseResponse<Book>>(`/admin/catalog/books/${id}`, data);
+      // Check for error code first
+      if (response.data?.errorCode) {
+        throw new Error(response.data.message || 'Failed to update book');
+      }
+      // If no errorCode and data exists, return it
+      if (response.data?.data) {
         return response.data.data;
       }
       throw new Error(response.data.message || 'Failed to update book');
@@ -157,7 +169,7 @@ export class CatalogService {
   public async getAllAuthors(): Promise<Author[]> {
     try {
       // Backend returns: { data: { authors: [...], pagination: {...} } or { data: [...] }, message?: string, errorCode?: string }
-      const response = await this.apiFetcher.get<BaseResponse<GetAuthorPageResponse | Author[]>>('/admin/catalog/books/authors');
+      const response = await this.apiFetcher.get<BaseResponse<GetAuthorPageResponse | Author[]>>('/admin/catalog/authors');
       
       // Check for error code first
       if (response.data?.errorCode) {
@@ -184,8 +196,13 @@ export class CatalogService {
 
   public async createAuthor(data: CreateAuthorRequest): Promise<Author> {
     try {
-      const response = await this.apiFetcher.post<ApiResponse<Author>>('/admin/catalog/books/authors', data);
-      if (response.data.success && response.data.data) {
+      const response = await this.apiFetcher.post<BaseResponse<Author>>('/admin/catalog/authors', data);
+      // Check for error code first
+      if (response.data?.errorCode) {
+        throw new Error(response.data.message || 'Failed to create author');
+      }
+      // If no errorCode and data exists, return it
+      if (response.data?.data) {
         return response.data.data;
       }
       throw new Error(response.data.message || 'Failed to create author');
@@ -196,8 +213,13 @@ export class CatalogService {
 
   public async updateAuthor(id: number, data: UpdateAuthorRequest): Promise<Author> {
     try {
-      const response = await this.apiFetcher.put<ApiResponse<Author>>(`/admin/catalog/books/authors/${id}`, data);
-      if (response.data.success && response.data.data) {
+      const response = await this.apiFetcher.put<BaseResponse<Author>>(`/admin/catalog/authors/${id}`, data);
+      // Check for error code first
+      if (response.data?.errorCode) {
+        throw new Error(response.data.message || 'Failed to update author');
+      }
+      // If no errorCode and data exists, return it
+      if (response.data?.data) {
         return response.data.data;
       }
       throw new Error(response.data.message || 'Failed to update author');
@@ -209,7 +231,7 @@ export class CatalogService {
   public async deleteAuthor(id: number): Promise<void> {
     try {
       // Backend returns: { data: null, message?: string, errorCode?: string }
-      const response = await this.apiFetcher.delete<BaseResponse<null>>(`/admin/catalog/books/authors/${id}`);
+      const response = await this.apiFetcher.delete<BaseResponse<null>>(`/admin/catalog/authors/${id}`);
       if (response.data?.errorCode) {
         throw new Error(response.data.message || 'Failed to delete author');
       }
@@ -223,7 +245,7 @@ export class CatalogService {
   public async getAllTranslators(): Promise<Translator[]> {
     try {
       // Backend returns: { data: { translators: [...], pagination: {...} } or { data: [...] }, message?: string, errorCode?: string }
-      const response = await this.apiFetcher.get<BaseResponse<GetTranslatorPageResponse | Translator[]>>('/admin/catalog/books/translators');
+      const response = await this.apiFetcher.get<BaseResponse<GetTranslatorPageResponse | Translator[]>>('/admin/catalog/translators');
       
       // Check for error code first
       if (response.data?.errorCode) {
@@ -250,8 +272,13 @@ export class CatalogService {
 
   public async createTranslator(data: CreateTranslatorRequest): Promise<Translator> {
     try {
-      const response = await this.apiFetcher.post<ApiResponse<Translator>>('/admin/catalog/translators', data);
-      if (response.data.success && response.data.data) {
+      const response = await this.apiFetcher.post<BaseResponse<Translator>>('/admin/catalog/translators', data);
+      // Check for error code first
+      if (response.data?.errorCode) {
+        throw new Error(response.data.message || 'Failed to create translator');
+      }
+      // If no errorCode and data exists, return it
+      if (response.data?.data) {
         return response.data.data;
       }
       throw new Error(response.data.message || 'Failed to create translator');
@@ -262,8 +289,13 @@ export class CatalogService {
 
   public async updateTranslator(id: number, data: UpdateTranslatorRequest): Promise<Translator> {
     try {
-      const response = await this.apiFetcher.put<ApiResponse<Translator>>(`/admin/catalog/translators/${id}`, data);
-      if (response.data.success && response.data.data) {
+      const response = await this.apiFetcher.put<BaseResponse<Translator>>(`/admin/catalog/translators/${id}`, data);
+      // Check for error code first
+      if (response.data?.errorCode) {
+        throw new Error(response.data.message || 'Failed to update translator');
+      }
+      // If no errorCode and data exists, return it
+      if (response.data?.data) {
         return response.data.data;
       }
       throw new Error(response.data.message || 'Failed to update translator');
@@ -274,10 +306,11 @@ export class CatalogService {
 
   public async deleteTranslator(id: number): Promise<void> {
     try {
-      const response = await this.apiFetcher.delete<ApiResponse<null>>(`/admin/catalog/translators/${id}`);
-      if (!response.data.success) {
+      const response = await this.apiFetcher.delete<BaseResponse<null>>(`/admin/catalog/translators/${id}`);
+      if (response.data?.errorCode) {
         throw new Error(response.data.message || 'Failed to delete translator');
       }
+      // If no errorCode, deletion was successful
     } catch (error) {
       throw this.handleError(error, 'Failed to delete translator');
     }
@@ -287,7 +320,7 @@ export class CatalogService {
   public async getAllPublishers(): Promise<Publisher[]> {
     try {
       // Backend returns: { data: { publishers: [...], pagination: {...} } or { data: [...] }, message?: string, errorCode?: string }
-      const response = await this.apiFetcher.get<BaseResponse<GetPublisherPageResponse | Publisher[]>>('/admin/catalog/books/publishers');
+      const response = await this.apiFetcher.get<BaseResponse<GetPublisherPageResponse | Publisher[]>>('/admin/catalog/publishers');
       
       // Check for error code first
       if (response.data?.errorCode) {
@@ -314,8 +347,13 @@ export class CatalogService {
 
   public async createPublisher(data: CreatePublisherRequest): Promise<Publisher> {
     try {
-      const response = await this.apiFetcher.post<ApiResponse<Publisher>>('/admin/catalog/publishers', data);
-      if (response.data.success && response.data.data) {
+      const response = await this.apiFetcher.post<BaseResponse<Publisher>>('/admin/catalog/publishers', data);
+      // Check for error code first
+      if (response.data?.errorCode) {
+        throw new Error(response.data.message || 'Failed to create publisher');
+      }
+      // If no errorCode and data exists, return it
+      if (response.data?.data) {
         return response.data.data;
       }
       throw new Error(response.data.message || 'Failed to create publisher');
@@ -326,8 +364,13 @@ export class CatalogService {
 
   public async updatePublisher(id: number, data: UpdatePublisherRequest): Promise<Publisher> {
     try {
-      const response = await this.apiFetcher.put<ApiResponse<Publisher>>(`/admin/catalog/publishers/${id}`, data);
-      if (response.data.success && response.data.data) {
+      const response = await this.apiFetcher.put<BaseResponse<Publisher>>(`/admin/catalog/publishers/${id}`, data);
+      // Check for error code first
+      if (response.data?.errorCode) {
+        throw new Error(response.data.message || 'Failed to update publisher');
+      }
+      // If no errorCode and data exists, return it
+      if (response.data?.data) {
         return response.data.data;
       }
       throw new Error(response.data.message || 'Failed to update publisher');
@@ -338,10 +381,11 @@ export class CatalogService {
 
   public async deletePublisher(id: number): Promise<void> {
     try {
-      const response = await this.apiFetcher.delete<ApiResponse<null>>(`/admin/catalog/publishers/${id}`);
-      if (!response.data.success) {
+      const response = await this.apiFetcher.delete<BaseResponse<null>>(`/admin/catalog/publishers/${id}`);
+      if (response.data?.errorCode) {
         throw new Error(response.data.message || 'Failed to delete publisher');
       }
+      // If no errorCode, deletion was successful
     } catch (error) {
       throw this.handleError(error, 'Failed to delete publisher');
     }
@@ -351,7 +395,7 @@ export class CatalogService {
   public async getAllGenres(): Promise<Genre[]> {
     try {
       // Backend returns: { data: { genres: [...], pagination: {...} } or { data: [...] }, message?: string, errorCode?: string }
-      const response = await this.apiFetcher.get<BaseResponse<GetGenrePageResponse | Genre[]>>('/admin/catalog/books/genres');
+      const response = await this.apiFetcher.get<BaseResponse<GetGenrePageResponse | Genre[]>>('/admin/catalog/genres');
       
       // Check for error code first
       if (response.data?.errorCode) {
@@ -378,8 +422,13 @@ export class CatalogService {
 
   public async createGenre(data: CreateGenreRequest): Promise<Genre> {
     try {
-      const response = await this.apiFetcher.post<ApiResponse<Genre>>('/admin/catalog/books/genres', data);
-      if (response.data.success && response.data.data) {
+      const response = await this.apiFetcher.post<BaseResponse<Genre>>('/admin/catalog/genres', data);
+      // Check for error code first
+      if (response.data?.errorCode) {
+        throw new Error(response.data.message || 'Failed to create genre');
+      }
+      // If no errorCode and data exists, return it
+      if (response.data?.data) {
         return response.data.data;
       }
       throw new Error(response.data.message || 'Failed to create genre');
@@ -390,8 +439,13 @@ export class CatalogService {
 
   public async updateGenre(id: number, data: UpdateGenreRequest): Promise<Genre> {
     try {
-      const response = await this.apiFetcher.put<ApiResponse<Genre>>(`/admin/catalog/books/genres/${id}`, data);
-      if (response.data.success && response.data.data) {
+      const response = await this.apiFetcher.put<BaseResponse<Genre>>(`/admin/catalog/genres/${id}`, data);
+      // Check for error code first
+      if (response.data?.errorCode) {
+        throw new Error(response.data.message || 'Failed to update genre');
+      }
+      // If no errorCode and data exists, return it
+      if (response.data?.data) {
         return response.data.data;
       }
       throw new Error(response.data.message || 'Failed to update genre');
@@ -403,7 +457,7 @@ export class CatalogService {
   public async deleteGenre(id: number): Promise<void> {
     try {
       // Backend returns: { data: null, message?: string, errorCode?: string }
-      const response = await this.apiFetcher.delete<BaseResponse<null>>(`/admin/catalog/books/genres/${id}`);
+      const response = await this.apiFetcher.delete<BaseResponse<null>>(`/admin/catalog/genres/${id}`);
       if (response.data?.errorCode) {
         throw new Error(response.data.message || 'Failed to delete genre');
       }

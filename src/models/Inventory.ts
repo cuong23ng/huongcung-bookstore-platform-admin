@@ -6,6 +6,7 @@ export interface StockLevel {
   bookTitle?: string;
   bookCode?: string;
   bookIsbn?: string;
+  sku?: string; // SKU from StockLevelDTO
   city: City; // Keep for backward compatibility, but prefer warehouseCity
   warehouseId?: number;
   warehouseCode?: string;
@@ -17,6 +18,7 @@ export interface StockLevel {
   availableQuantity: number; // Calculated: quantity - reservedQuantity
   isLowStock?: boolean; // Calculated: quantity <= reorderLevel
   isOutOfStock?: boolean; // Calculated: availableQuantity <= 0
+  status?: 'LOW_STOCK' | 'OUT_OF_STOCK' | 'AVAILABLE'; // StockStatus from backend
   reorderLevel?: number;
   reorderQuantity?: number;
   lastRestocked?: string;

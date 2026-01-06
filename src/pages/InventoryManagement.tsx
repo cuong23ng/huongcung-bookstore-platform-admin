@@ -10,10 +10,11 @@ import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } f
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "../components/ui/select";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "../components/ui/tabs";
 import { useToast } from "../hooks/use-toast";
-import { ArrowLeft, Eye, ChevronLeft, ChevronRight, AlertTriangle, Edit, History } from "lucide-react";
+import { ArrowLeft, Eye, ChevronLeft, ChevronRight, AlertTriangle, Edit, History, X } from "lucide-react";
 import { InventoryService } from "../services/InventoryService";
 import { getAuthData } from "../services/AdminAuthService";
-import type { StockLevel, City, AvailabilityStatus, StockAdjustmentRequest, StockAdjustment } from "../models";
+import type { StockLevel, City, StockAdjustmentRequest, StockAdjustment } from "../models";
+import { Badge } from "../components/ui/badge";
 
 export default function InventoryManagement() {
   const navigate = useNavigate();
@@ -22,9 +23,11 @@ export default function InventoryManagement() {
   const [detailsDialogOpen, setDetailsDialogOpen] = useState(false);
   const [adjustDialogOpen, setAdjustDialogOpen] = useState(false);
   const [selectedStock, setSelectedStock] = useState<StockLevel | null>(null);
-  const [bookTitleFilter, setBookTitleFilter] = useState("");
+  const [searchQuery, setSearchQuery] = useState("");
+  const [searchType, setSearchType] = useState<'TITLE' | 'SKU' | 'ISBN'>('TITLE');
   const [cityFilter, setCityFilter] = useState<City | "all">("all");
-  const [availabilityFilter, setAvailabilityFilter] = useState<AvailabilityStatus>("all");
+  const [warehouseCodeFilter, setWarehouseCodeFilter] = useState<string | undefined>();
+  const [statusFilter, setStatusFilter] = useState<'LOW_STOCK' | 'OUT_OF_STOCK' | 'AVAILABLE' | "all">("all");
   const [currentPage, setCurrentPage] = useState(0);
   const [pageSize] = useState(20);
   const [adjustmentHistoryPage, setAdjustmentHistoryPage] = useState(0);
@@ -72,17 +75,19 @@ export default function InventoryManagement() {
   // Reset to first page when filters change
   useEffect(() => {
     setCurrentPage(0);
-  }, [bookTitleFilter, cityFilter, availabilityFilter]);
+  }, [searchQuery, searchType, cityFilter, warehouseCodeFilter, statusFilter]);
 
   // Fetch stock levels with pagination and filters
   const { data: stockData, isLoading, error, refetch } = useQuery({
-    queryKey: ['stockLevels', currentPage, pageSize, effectiveCity, bookTitleFilter, availabilityFilter, userRole],
+    queryKey: ['stockLevels', currentPage, pageSize, effectiveCity, searchQuery, searchType, warehouseCodeFilter, statusFilter, userRole],
     queryFn: () => InventoryService.getInstance().getStockLevels({
       page: currentPage,
       size: pageSize,
       city: effectiveCity,
-      bookTitle: bookTitleFilter || undefined,
-      availabilityStatus: availabilityFilter !== 'all' ? availabilityFilter : undefined,
+      q: searchQuery || undefined,
+      searchBy: searchType,
+      warehouseCode: warehouseCodeFilter,
+      status: statusFilter !== 'all' ? statusFilter : undefined,
       role: userRole,
     }),
   });
@@ -198,13 +203,41 @@ export default function InventoryManagement() {
   const getCityLabel = (city: string) => {
     switch (city) {
       case "Hanoi":
+      case "HANOI":
         return "Hà Nội";
       case "HCMC":
         return "TP. Hồ Chí Minh";
       case "Da Nang":
+      case "DANANG":
         return "Đà Nẵng";
       default:
         return city;
+    }
+  };
+
+  const getStatusLabel = (status?: string) => {
+    switch (status) {
+      case "LOW_STOCK":
+        return "Tồn kho thấp";
+      case "OUT_OF_STOCK":
+        return "Hết hàng";
+      case "AVAILABLE":
+        return "Có sẵn";
+      default:
+        return status || "-";
+    }
+  };
+
+  const getStatusBadgeVariant = (status?: string): "default" | "secondary" | "destructive" | "outline" => {
+    switch (status) {
+      case "LOW_STOCK":
+        return "secondary";
+      case "OUT_OF_STOCK":
+        return "destructive";
+      case "AVAILABLE":
+        return "default";
+      default:
+        return "outline";
     }
   };
 
@@ -279,40 +312,92 @@ export default function InventoryManagement() {
                 </CardDescription>
               </div>
             </div>
-            <div className="flex gap-4 mt-4 flex-wrap">
-              <Input
-                placeholder="Tìm kiếm theo tên sách..."
-                value={bookTitleFilter}
-                onChange={(e) => setBookTitleFilter(e.target.value)}
-                className="max-w-sm"
-              />
-              {userRole === 'admin' && (
-                <Select value={cityFilter} onValueChange={(value) => setCityFilter(value as City | "all")}>
-                  <SelectTrigger className="w-48">
-                    <SelectValue placeholder="Lọc theo thành phố" />
+            <div className="space-y-4 mt-4">
+              <div className="flex gap-2">
+                <Input
+                  placeholder="Tìm kiếm..."
+                  value={searchQuery}
+                  onChange={(e) => setSearchQuery(e.target.value)}
+                  className="flex-1 max-w-md"
+                />
+                <Select value={searchType} onValueChange={(value) => setSearchType(value as 'TITLE' | 'SKU' | 'ISBN')}>
+                  <SelectTrigger className="w-32">
+                    <SelectValue />
                   </SelectTrigger>
                   <SelectContent>
-                    <SelectItem value="all">Tất cả thành phố</SelectItem>
-                    <SelectItem value="HANOI">Hà Nội</SelectItem>
-                    <SelectItem value="HCMC">TP. Hồ Chí Minh</SelectItem>
-                    <SelectItem value="DANANG">Đà Nẵng</SelectItem>
+                    <SelectItem value="TITLE">Tên sách</SelectItem>
+                    <SelectItem value="SKU">SKU</SelectItem>
+                    <SelectItem value="ISBN">ISBN</SelectItem>
                   </SelectContent>
                 </Select>
-              )}
-              <Select 
-                value={availabilityFilter} 
-                onValueChange={(value) => setAvailabilityFilter(value as AvailabilityStatus)}
-              >
-                <SelectTrigger className="w-48">
-                  <SelectValue placeholder="Lọc theo trạng thái" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="all">Tất cả</SelectItem>
-                  <SelectItem value="available">Có sẵn</SelectItem>
-                  <SelectItem value="low_stock">Tồn kho thấp</SelectItem>
-                  <SelectItem value="out_of_stock">Hết hàng</SelectItem>
-                </SelectContent>
-              </Select>
+              </div>
+              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+                {userRole === 'admin' && (
+                  <div>
+                    <Label htmlFor="city-filter">Thành phố</Label>
+                    <Select value={cityFilter} onValueChange={(value) => setCityFilter(value as City | "all")}>
+                      <SelectTrigger id="city-filter">
+                        <SelectValue placeholder="Tất cả thành phố" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="all">Tất cả thành phố</SelectItem>
+                        <SelectItem value="HANOI">Hà Nội</SelectItem>
+                        <SelectItem value="HCMC">TP. Hồ Chí Minh</SelectItem>
+                        <SelectItem value="DANANG">Đà Nẵng</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </div>
+                )}
+                <div>
+                  <Label htmlFor="warehouse-filter">Kho</Label>
+                  <Select
+                    value={warehouseCodeFilter || 'all'}
+                    onValueChange={(value) => setWarehouseCodeFilter(value === 'all' ? undefined : value)}
+                  >
+                    <SelectTrigger id="warehouse-filter">
+                      <SelectValue placeholder="Tất cả kho" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="all">Tất cả kho</SelectItem>
+                      <SelectItem value="WH-HN-001">WH-HN-001</SelectItem>
+                      <SelectItem value="WH-DN-001">WH-DN-001</SelectItem>
+                      <SelectItem value="WH-HCM-001">WH-HCM-001</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+                <div>
+                  <Label htmlFor="status-filter">Trạng thái</Label>
+                  <Select 
+                    value={statusFilter} 
+                    onValueChange={(value) => setStatusFilter(value as 'LOW_STOCK' | 'OUT_OF_STOCK' | 'AVAILABLE' | "all")}
+                  >
+                    <SelectTrigger id="status-filter">
+                      <SelectValue placeholder="Tất cả trạng thái" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="all">Tất cả</SelectItem>
+                      <SelectItem value="AVAILABLE">Có sẵn</SelectItem>
+                      <SelectItem value="LOW_STOCK">Tồn kho thấp</SelectItem>
+                      <SelectItem value="OUT_OF_STOCK">Hết hàng</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+                <div className="flex items-end">
+                  <Button
+                    variant="outline"
+                    onClick={() => {
+                      setSearchQuery("");
+                      setSearchType('TITLE');
+                      setCityFilter(userRole === 'store_manager' ? (userCity as City | "all") : "all");
+                      setWarehouseCodeFilter(undefined);
+                      setStatusFilter("all");
+                    }}
+                  >
+                    <X className="h-4 w-4 mr-2" />
+                    Xóa bộ lọc
+                  </Button>
+                </div>
+              </div>
             </div>
           </CardHeader>
           <CardContent>
@@ -331,7 +416,7 @@ export default function InventoryManagement() {
             ) : stockLevels.length === 0 ? (
               <div className="text-center py-8">
                 <p className="text-muted-foreground">
-                  {bookTitleFilter || availabilityFilter !== 'all' || cityFilter !== 'all'
+                  {searchQuery || statusFilter !== 'all' || cityFilter !== 'all' || warehouseCodeFilter
                     ? "Không tìm thấy sách nào phù hợp với bộ lọc"
                     : "Chưa có dữ liệu tồn kho"}
                 </p>
@@ -341,91 +426,48 @@ export default function InventoryManagement() {
                 <Table>
                   <TableHeader>
                     <TableRow>
+                      <TableHead>Ngày tạo</TableHead>
                       <TableHead>Tên sách</TableHead>
-                      <TableHead>Warehouse</TableHead>
-                      <TableHead>Tổng số lượng</TableHead>
-                      <TableHead>Đã đặt trước</TableHead>
-                      <TableHead>Có sẵn</TableHead>
-                      <TableHead>Mức đặt lại</TableHead>
-                      <TableHead className="text-right">Thao tác</TableHead>
+                      <TableHead>SKU</TableHead>
+                      <TableHead>Mã kho</TableHead>
+                      <TableHead>Thành phố</TableHead>
+                      <TableHead>Trạng thái</TableHead>
+                      <TableHead>Lần nhập hàng cuối</TableHead>
                     </TableRow>
                   </TableHeader>
                   <TableBody>
                     {stockLevels.map((stock) => {
-                      const lowStock = isLowStock(stock);
-                      const outOfStock = isOutOfStock(stock);
-                      const quantity = stock.quantity ?? stock.totalQuantity;
-                      const reservedPercent = quantity > 0 ? Math.round((stock.reservedQuantity / quantity) * 100) : 0;
+                      const status = stock.status;
+                      const rowClassName = status === 'LOW_STOCK' 
+                        ? "bg-yellow-50 dark:bg-yellow-950/20" 
+                        : status === 'OUT_OF_STOCK' 
+                        ? "bg-red-50 dark:bg-red-950/20" 
+                        : "";
                       
                       return (
                         <TableRow 
                           key={stock.id}
-                          className={outOfStock ? "bg-red-50 dark:bg-red-950/20" : lowStock ? "bg-orange-50 dark:bg-orange-950/20" : ""}
+                          className={rowClassName}
                         >
+                          <TableCell>{formatDate(stock.createdAt)}</TableCell>
                           <TableCell className="font-medium">
-                            <div className="flex items-center gap-2">
-                              {stock.bookTitle || `Book ID: ${stock.bookId}`}
-                              {outOfStock && (
-                                <span className="px-2 py-0.5 text-xs font-semibold rounded bg-red-100 text-red-800 dark:bg-red-900 dark:text-red-200">
-                                  Hết hàng
-                                </span>
-                              )}
-                              {!outOfStock && lowStock && (
-                                <span className="px-2 py-0.5 text-xs font-semibold rounded bg-orange-100 text-orange-800 dark:bg-orange-900 dark:text-orange-200">
-                                  Tồn kho thấp
-                                </span>
-                              )}
-                            </div>
+                            {stock.bookTitle || `Book ID: ${stock.bookId}`}
                           </TableCell>
-                          <TableCell>{getWarehouseDisplay(stock)}</TableCell>
+                          <TableCell>{stock.sku || "-"}</TableCell>
+                          <TableCell>{stock.warehouseCode || "-"}</TableCell>
                           <TableCell>
-                            <div className="font-semibold">{quantity}</div>
+                            {stock.warehouseCity 
+                              ? getCityLabel(stock.warehouseCity) 
+                              : stock.city 
+                              ? getCityLabel(stock.city) 
+                              : "-"}
                           </TableCell>
                           <TableCell>
-                            <div className="flex flex-col">
-                              <span className="font-medium">{stock.reservedQuantity}</span>
-                            </div>
+                            <Badge variant={getStatusBadgeVariant(status)}>
+                              {getStatusLabel(status)}
+                            </Badge>
                           </TableCell>
-                          <TableCell>
-                            <div className={
-                              outOfStock
-                                ? "text-destructive font-semibold" 
-                                : stock.availableQuantity < 0
-                                ? "text-orange-600 font-semibold"
-                                : stock.availableQuantity === 0
-                                ? "text-yellow-600 font-semibold"
-                                : "font-semibold"
-                            }>
-                          {stock.availableQuantity}
-                            </div>
-                            {stock.availableQuantity < 0 && (
-                              <div className="text-xs text-orange-600 mt-0.5">
-                                (Thiếu {Math.abs(stock.availableQuantity)})
-                              </div>
-                            )}
-                          </TableCell>
-                          <TableCell>
-                            {stock.reorderLevel !== undefined && stock.reorderLevel !== null ? (
-                              <div className="flex items-center gap-2">
-                                <span>{stock.reorderLevel}</span>
-                                {lowStock && (
-                                  <AlertTriangle className="h-4 w-4 text-orange-500" />
-                                )}
-                              </div>
-                            ) : (
-                              <span className="text-muted-foreground">-</span>
-                            )}
-                        </TableCell>
-                        <TableCell className="text-right">
-                          <Button
-                            variant="ghost"
-                            size="sm"
-                              onClick={() => handleViewDetails(stock)}
-                          >
-                              <Eye className="h-4 w-4 mr-1" />
-                              See Details
-                          </Button>
-                          </TableCell>
+                          <TableCell>{formatDate(stock.lastRestocked)}</TableCell>
                         </TableRow>
                       );
                     })}

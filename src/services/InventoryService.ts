@@ -1,5 +1,5 @@
 import { ApiClient } from '../integrations/ApiClient';
-import { 
+import type { 
   StockLevel, 
   AdjustStockRequest, 
   StockAdjustmentRequest,
@@ -7,17 +7,35 @@ import {
   ApiResponse, 
   City, 
   PaginatedStockLevels, 
-  AvailabilityStatus 
+  AvailabilityStatus,
+  SaleOrderStatus,
+  PaginatedSaleOrdersResponse,
+  SaleOrder
 } from '../models';
-import { AxiosInstance, AxiosError } from 'axios';
+import type { AxiosInstance } from 'axios';
+import { AxiosError } from 'axios';
 
 export interface GetStockLevelsParams {
   page?: number;
   size?: number;
   city?: City;
-  bookTitle?: string;
-  availabilityStatus?: AvailabilityStatus;
+  q?: string; // Search query
+  searchBy?: 'TITLE' | 'SKU' | 'ISBN'; // Search type, default 'TITLE'
+  warehouseCode?: string; // Warehouse code filter
+  status?: 'LOW_STOCK' | 'OUT_OF_STOCK' | 'AVAILABLE'; // Status filter
   role?: 'admin' | 'store_manager';
+}
+
+export interface GetSaleOrdersParams {
+  page?: number;
+  size?: number;
+  code?: string;
+  city?: City;
+  warehouse?: string;
+  status?: SaleOrderStatus;
+  startTime?: string;
+  endTime?: string;
+  sort?: string;
 }
 
 export class InventoryService {
@@ -37,15 +55,15 @@ export class InventoryService {
         page = 0,
         size = 20,
         city,
-        bookTitle,
-        availabilityStatus,
+        q,
+        searchBy = 'TITLE',
+        warehouseCode,
+        status,
         role = 'store_manager'
       } = params;
 
-      // Determine endpoint based on role
-      const endpoint = role === 'admin' 
-        ? '/admin/inventory/stock'
-        : '/store-manager/inventory/stock';
+      // Use admin endpoint for the new API structure
+      const endpoint = '/admin/inventory/stock';
 
       // Build query parameters
       const queryParams: Record<string, string | number> = {
@@ -54,17 +72,23 @@ export class InventoryService {
       };
 
       // Add optional filters
+      if (q) {
+        queryParams.q = q;
+      }
+      if (searchBy) {
+        queryParams.searchBy = searchBy;
+      }
       if (city) {
         queryParams.city = city;
       }
-      if (bookTitle) {
-        queryParams.bookTitle = bookTitle;
+      if (warehouseCode) {
+        queryParams.warehouseCode = warehouseCode;
       }
-      if (availabilityStatus && availabilityStatus !== 'all') {
-        queryParams.availabilityStatus = availabilityStatus;
+      if (status) {
+        queryParams.status = status;
       }
 
-      // Backend returns BaseResponse with data as a Map containing stockLevels and pagination
+      // Backend returns BaseResponse with data as StockLevelResponse containing stockLevels and pagination
       const response = await this.apiFetcher.get<any>(endpoint, { 
         params: queryParams 
       });
@@ -218,6 +242,209 @@ export class InventoryService {
           (error.response?.data as any)?.message ||
           error.message ||
           'Failed to fetch stock for book. Please try again.';
+        throw new Error(errorMessage);
+      }
+      throw error;
+    }
+  }
+
+  /**
+   * Get paginated sale orders with filters
+   * @param params Filter parameters including code, city, warehouse, status, and date range
+   * @returns Paginated sale orders response
+   */
+  public async getSaleOrders(params: GetSaleOrdersParams = {}): Promise<PaginatedSaleOrdersResponse> {
+    try {
+      const {
+        page = 0,
+        size = 20,
+        code,
+        city,
+        warehouse,
+        status,
+        startTime,
+        endTime,
+        sort
+      } = params;
+
+      const endpoint = '/admin/inventory/sale-order';
+
+      // Build query parameters
+      const queryParams: Record<string, string | number> = {
+        page,
+        size,
+      };
+
+      // Add optional filters
+      if (code && code.trim()) {
+        queryParams.code = code.trim();
+      }
+      if (city) {
+        queryParams.city = city;
+      }
+      if (warehouse) {
+        queryParams.warehouse = warehouse;
+      }
+      if (status) {
+        queryParams.status = status;
+      }
+      if (startTime) {
+        queryParams.startTime = startTime;
+      }
+      if (endTime) {
+        queryParams.endTime = endTime;
+      }
+      if (sort) {
+        queryParams.sort = sort;
+      }
+
+      // Backend returns BaseResponse with data as SearchResponse
+      const response = await this.apiFetcher.get<any>(endpoint, { 
+        params: queryParams 
+      });
+      
+      // Check if there's an error code (BaseResponse structure)
+      if (response.data.errorCode) {
+        throw new Error(response.data.message || 'Failed to fetch sale orders');
+      }
+
+      // Extract data from BaseResponse -> SearchResponse structure
+      const searchResponse = response.data.data;
+      if (!searchResponse) {
+        throw new Error(response.data.message || 'No data returned from server');
+      }
+
+      // Map backend SearchResponse to frontend format
+      // Backend: { data: SaleOrderDTO[], pagination: PaginationInfo }
+      // Frontend: { saleOrders: SaleOrder[], pagination: { page, size, totalElements, totalPages } }
+      const backendData = searchResponse.data || [];
+      const backendPagination = searchResponse.pagination || {};
+
+      return {
+        saleOrders: backendData,
+        pagination: {
+          page: (backendPagination.currentPage || 1) - 1, // Convert 1-based to 0-based
+          size: backendPagination.pageSize || size,
+          totalElements: backendPagination.totalResults || 0,
+          totalPages: backendPagination.totalPages || 0
+        }
+      };
+    } catch (error) {
+      if (error instanceof AxiosError) {
+        const errorMessage = 
+          (error.response?.data as any)?.error?.message ||
+          (error.response?.data as any)?.message ||
+          error.message ||
+          'Failed to fetch sale orders. Please try again.';
+        throw new Error(errorMessage);
+      }
+      throw error;
+    }
+  }
+
+  /**
+   * Create shipping order for a sale order
+   * @param saleOrderId The sale order ID
+   * @returns Tracking number (orderCode) from shipping service
+   */
+  public async createShippingOrder(saleOrderId: number): Promise<string> {
+    try {
+      const endpoint = `/admin/inventory/sale-order/${saleOrderId}/create-shipping-order`;
+
+      const response = await this.apiFetcher.post<any>(endpoint);
+
+      // Check if there's an error code (BaseResponse structure)
+      if (response.data.errorCode) {
+        throw new Error(response.data.message || 'Failed to create shipping order');
+      }
+
+      // Extract data from BaseResponse -> ShippingOrderDTO structure
+      const shippingOrderData = response.data.data;
+      if (!shippingOrderData) {
+        throw new Error(response.data.message || 'No data returned from server');
+      }
+
+      // ShippingOrderDTO contains: orderCode, expectedDeliveryTime, totalFee
+      // Return orderCode as tracking number
+      return shippingOrderData.orderCode || '';
+    } catch (error) {
+      if (error instanceof AxiosError) {
+        const errorMessage = 
+          (error.response?.data as any)?.error?.message ||
+          (error.response?.data as any)?.message ||
+          error.message ||
+          'Failed to create shipping order. Please try again.';
+        throw new Error(errorMessage);
+      }
+      throw error;
+    }
+  }
+
+  /**
+   * Get sale order details by ID
+   * @param saleOrderId The sale order ID
+   * @returns Sale order details with book information
+   */
+  public async getSaleOrderById(saleOrderId: number): Promise<SaleOrder> {
+    try {
+      const endpoint = `/admin/inventory/sale-order/${saleOrderId}`;
+
+      const response = await this.apiFetcher.get<any>(endpoint);
+
+      // Check if there's an error code (BaseResponse structure)
+      if (response.data.errorCode) {
+        throw new Error(response.data.message || 'Failed to fetch sale order details');
+      }
+
+      // Extract data from BaseResponse -> SaleOrderDTO structure
+      const saleOrderData = response.data.data;
+      if (!saleOrderData) {
+        throw new Error(response.data.message || 'No data returned from server');
+      }
+
+      return saleOrderData;
+    } catch (error) {
+      if (error instanceof AxiosError) {
+        const errorMessage = 
+          (error.response?.data as any)?.error?.message ||
+          (error.response?.data as any)?.message ||
+          error.message ||
+          'Failed to fetch sale order details. Please try again.';
+        throw new Error(errorMessage);
+      }
+      throw error;
+    }
+  }
+
+  /**
+   * Ship a sale order (update status)
+   * @param saleOrderId The sale order ID
+   * @param status The new status (PICKED_UP or IN_TRANSIT)
+   * @returns Success message
+   */
+  public async shipSaleOrder(saleOrderId: number, status: SaleOrderStatus): Promise<void> {
+    try {
+      const endpoint = `/admin/inventory/sale-order/${saleOrderId}/ship`;
+
+      // Pass status as query parameter
+      const response = await this.apiFetcher.put<any>(endpoint, null, {
+        params: { status }
+      });
+
+      // Check if there's an error code (BaseResponse structure)
+      if (response.data.errorCode) {
+        throw new Error(response.data.message || 'Failed to ship sale order');
+      }
+
+      // Success - no data returned, just message
+      return;
+    } catch (error) {
+      if (error instanceof AxiosError) {
+        const errorMessage = 
+          (error.response?.data as any)?.error?.message ||
+          (error.response?.data as any)?.message ||
+          error.message ||
+          'Failed to ship sale order. Please check your input and try again.';
         throw new Error(errorMessage);
       }
       throw error;

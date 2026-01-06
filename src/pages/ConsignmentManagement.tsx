@@ -3,6 +3,7 @@ import { useNavigate } from "react-router-dom";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { Button } from "../components/ui/button";
 import { Label } from "../components/ui/label";
+import { Input } from "../components/ui/input";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "../components/ui/card";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "../components/ui/table";
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "../components/ui/dialog";
@@ -10,10 +11,10 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from ".
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "../components/ui/tabs";
 import { Badge } from "../components/ui/badge";
 import { useToast } from "../hooks/use-toast";
-import { ArrowLeft, Loader2, Ship, Package } from "lucide-react";
-import { OrderFulfillmentService } from "../services/OrderFulfillmentService";
+import { ArrowLeft, Loader2, Ship, Package, X, Eye } from "lucide-react";
+import { InventoryService } from "../services/InventoryService";
 import { getAuthData } from "../services/AdminAuthService";
-import type { Consignment, ConsignmentStatus, City, ConsignmentShipRequest, PaginatedConsignmentResponse } from "../models";
+import type { Consignment, ConsignmentStatus, City, ConsignmentShipRequest, PaginatedConsignmentResponse, SaleOrder, SaleOrderStatus, PaginatedSaleOrdersResponse } from "../models";
 
 export default function ConsignmentManagement() {
   const navigate = useNavigate();
@@ -40,14 +41,24 @@ export default function ConsignmentManagement() {
   // Active tab state
   const [activeTab, setActiveTab] = useState("created");
   
-  // Consignments management filters
+  // Consignments management filters (all tab)
+  const [codeFilter, setCodeFilter] = useState<string | undefined>();
   const [consignmentCityFilter, setConsignmentCityFilter] = useState<City | undefined>(userRole === 'store_manager' ? userCity : undefined);
-  const [consignmentStatusFilter, setConsignmentStatusFilter] = useState<ConsignmentStatus | undefined>('PENDING');
+  const [warehouseFilter, setWarehouseFilter] = useState<string | undefined>();
+  const [consignmentStatusFilter, setConsignmentStatusFilter] = useState<SaleOrderStatus | undefined>('PENDING');
+  const [startDateFilter, setStartDateFilter] = useState<string | undefined>();
+  const [endDateFilter, setEndDateFilter] = useState<string | undefined>();
+  const [sortOrder, setSortOrder] = useState<'asc' | 'desc'>('desc');
   const [consignmentPage, setConsignmentPage] = useState(0);
   const [consignmentPageSize] = useState(20);
   
   // Filters for CREATED consignments (new section)
+  const [createdCodeFilter, setCreatedCodeFilter] = useState<string | undefined>();
   const [createdConsignmentCityFilter, setCreatedConsignmentCityFilter] = useState<City | undefined>(userRole === 'store_manager' ? userCity : undefined);
+  const [createdWarehouseFilter, setCreatedWarehouseFilter] = useState<string | undefined>();
+  const [createdStartDateFilter, setCreatedStartDateFilter] = useState<string | undefined>();
+  const [createdEndDateFilter, setCreatedEndDateFilter] = useState<string | undefined>();
+  const [createdSortOrder, setCreatedSortOrder] = useState<'asc' | 'desc'>('desc');
   const [createdConsignmentPage, setCreatedConsignmentPage] = useState(0);
   const [createdConsignmentPageSize] = useState(20);
   
@@ -56,36 +67,130 @@ export default function ConsignmentManagement() {
   const [shipDialogOpen, setShipDialogOpen] = useState(false);
   const [editingConsignmentId, setEditingConsignmentId] = useState<number | null>(null);
 
-  // Fetch consignments for management section
-  const { data: consignmentsData, isLoading: isLoadingConsignments } = useQuery<PaginatedConsignmentResponse>({
-    queryKey: ['consignmentsList', consignmentCityFilter, consignmentStatusFilter, consignmentPage, consignmentPageSize, userRole],
-    queryFn: () => OrderFulfillmentService.getInstance().getConsignments(
-      consignmentPage,
-      consignmentPageSize,
-      consignmentCityFilter,
-      consignmentStatusFilter,
-      userRole
-    ),
+  // State for sale order details dialog
+  const [saleOrderDetailsDialogOpen, setSaleOrderDetailsDialogOpen] = useState(false);
+  const [selectedSaleOrderId, setSelectedSaleOrderId] = useState<number | null>(null);
+
+  // Helper function to format date for API (yyyy-MM-dd HH:mm:ss)
+  const formatDateForAPI = (dateString: string | undefined, isEndDate: boolean = false): string | undefined => {
+    if (!dateString) return undefined;
+    // HTML5 date input returns YYYY-MM-DD format
+    // Append time: 00:00:00 for start, 23:59:59 for end
+    return isEndDate ? `${dateString} 23:59:59` : `${dateString} 00:00:00`;
+  };
+
+  // Helper function to format date and time for display
+  const formatDateTime = (dateString: string | undefined | null): string => {
+    if (!dateString) return "-";
+    try {
+      const date = new Date(dateString);
+      return new Intl.DateTimeFormat('vi-VN', {
+        day: '2-digit',
+        month: '2-digit',
+        year: 'numeric',
+        hour: '2-digit',
+        minute: '2-digit',
+        hour12: false
+      }).format(date);
+    } catch (error) {
+      return "-";
+    }
+  };
+
+  // Helper function to map SaleOrder to Consignment format
+  const mapSaleOrderToConsignment = (saleOrder: SaleOrder): Consignment => {
+    return {
+      id: saleOrder.id,
+      code: saleOrder.code,
+      orderId: saleOrder.orderId || 0,
+      orderNumber: saleOrder.orderNumber,
+      status: saleOrder.status as ConsignmentStatus,
+      trackingNumber: saleOrder.trackingNumber,
+      shippingCompany: saleOrder.shippingCompany,
+      estimatedDeliveryDate: saleOrder.estimatedDeliveryDate,
+      actualDeliveryDate: saleOrder.actualDeliveryDate,
+      shippingAddress: saleOrder.shippingAddress ? JSON.stringify(saleOrder.shippingAddress) : undefined,
+      notes: saleOrder.notes,
+      totalPrice: saleOrder.totalPrice,
+      codAmount: saleOrder.codAmount,
+      warehouseCity: saleOrder.warehouseCity,
+      warehouseId: saleOrder.warehouseId,
+      warehouseCode: saleOrder.warehouseCode,
+      customerName: saleOrder.customerName,
+      customerEmail: saleOrder.customerEmail,
+      entries: saleOrder.entries.map(entry => ({
+        id: entry.id,
+        orderEntryId: 0, // Not available in SaleOrderEntry
+        bookId: 0, // Not available in SaleOrderEntry
+        bookTitle: entry.sku, // Using SKU as fallback
+        bookCode: entry.sku,
+        quantity: entry.quantity,
+        shippedQuantity: entry.shippedQuantity,
+        unitPrice: entry.unitPrice,
+        totalPrice: entry.totalPrice
+      })),
+      createdAt: saleOrder.createdAt,
+      updatedAt: saleOrder.updatedAt
+    };
+  };
+
+  // Fetch sale orders for management section (all tab)
+  const { data: saleOrdersData, isLoading: isLoadingConsignments } = useQuery<PaginatedSaleOrdersResponse>({
+    queryKey: ['saleOrdersList', codeFilter, consignmentCityFilter, warehouseFilter, consignmentStatusFilter, startDateFilter, endDateFilter, sortOrder, consignmentPage, consignmentPageSize],
+    queryFn: () => InventoryService.getInstance().getSaleOrders({
+      page: consignmentPage,
+      size: consignmentPageSize,
+      code: codeFilter,
+      city: consignmentCityFilter,
+      warehouse: warehouseFilter,
+      status: consignmentStatusFilter,
+      startTime: formatDateForAPI(startDateFilter, false),
+      endTime: formatDateForAPI(endDateFilter, true),
+      sort: `createdAt,${sortOrder}`
+    }),
   });
 
-  // Fetch CREATED consignments (new section - consignments that haven't created shipping order yet)
-  const { data: createdConsignmentsData, isLoading: isLoadingCreatedConsignments } = useQuery<PaginatedConsignmentResponse>({
-    queryKey: ['createdConsignmentsList', createdConsignmentCityFilter, createdConsignmentPage, createdConsignmentPageSize, userRole],
-    queryFn: () => OrderFulfillmentService.getInstance().getConsignments(
-      createdConsignmentPage,
-      createdConsignmentPageSize,
-      createdConsignmentCityFilter,
-      'CREATED',
-      userRole
-    ),
+  // Fetch CREATED sale orders (new section - consignments that haven't created shipping order yet)
+  const { data: createdSaleOrdersData, isLoading: isLoadingCreatedConsignments } = useQuery<PaginatedSaleOrdersResponse>({
+    queryKey: ['createdSaleOrdersList', createdCodeFilter, createdConsignmentCityFilter, createdWarehouseFilter, createdStartDateFilter, createdEndDateFilter, createdSortOrder, createdConsignmentPage, createdConsignmentPageSize],
+    queryFn: () => InventoryService.getInstance().getSaleOrders({
+      page: createdConsignmentPage,
+      size: createdConsignmentPageSize,
+      code: createdCodeFilter,
+      city: createdConsignmentCityFilter,
+      warehouse: createdWarehouseFilter,
+      status: 'CREATED',
+      startTime: formatDateForAPI(createdStartDateFilter, false),
+      endTime: formatDateForAPI(createdEndDateFilter, true),
+      sort: `createdAt,${createdSortOrder}`
+    }),
+  });
+
+  // Map sale orders to consignments for display
+  const consignmentsData: PaginatedConsignmentResponse | undefined = saleOrdersData ? {
+    consignments: saleOrdersData.saleOrders.map(mapSaleOrderToConsignment),
+    pagination: saleOrdersData.pagination
+  } : undefined;
+
+  const createdConsignmentsData: PaginatedConsignmentResponse | undefined = createdSaleOrdersData ? {
+    consignments: createdSaleOrdersData.saleOrders.map(mapSaleOrderToConsignment),
+    pagination: createdSaleOrdersData.pagination
+  } : undefined;
+
+  // Fetch sale order details
+  const { data: saleOrderDetails, isLoading: isLoadingSaleOrderDetails } = useQuery<SaleOrder>({
+    queryKey: ['saleOrderDetails', selectedSaleOrderId],
+    queryFn: () => InventoryService.getInstance().getSaleOrderById(selectedSaleOrderId!),
+    enabled: !!selectedSaleOrderId && saleOrderDetailsDialogOpen,
   });
 
   // Ship consignment mutation
   const shipConsignmentMutation = useMutation({
     mutationFn: ({ id, request }: { id: number; request: ConsignmentShipRequest }) => 
-      OrderFulfillmentService.getInstance().shipConsignment(id, request, userRole),
+      InventoryService.getInstance().shipSaleOrder(id, request.status),
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['consignmentsList'] });
+      queryClient.invalidateQueries({ queryKey: ['saleOrdersList'] });
+      queryClient.invalidateQueries({ queryKey: ['createdSaleOrdersList'] });
       queryClient.invalidateQueries({ queryKey: ['fulfillmentQueue'] });
       toast({
         title: "Gửi hàng thành công",
@@ -142,11 +247,11 @@ export default function ConsignmentManagement() {
 
   // Create shipping order mutation
   const createShippingOrderMutation = useMutation({
-    mutationFn: (consignmentId: number) => 
-      OrderFulfillmentService.getInstance().createShippingOrderForConsignment(consignmentId),
+    mutationFn: (saleOrderId: number) => 
+      InventoryService.getInstance().createShippingOrder(saleOrderId),
     onSuccess: (trackingNumber) => {
-      queryClient.invalidateQueries({ queryKey: ['consignmentsList'] });
-      queryClient.invalidateQueries({ queryKey: ['createdConsignmentsList'] });
+      queryClient.invalidateQueries({ queryKey: ['saleOrdersList'] });
+      queryClient.invalidateQueries({ queryKey: ['createdSaleOrdersList'] });
       toast({
         title: "Tạo đơn vận chuyển thành công",
         description: `Mã vận đơn: ${trackingNumber}`,
@@ -209,12 +314,14 @@ export default function ConsignmentManagement() {
     }
   };
 
-  const getCityLabel = (city: string) => {
+  const getCityLabel = (city: string | City) => {
     switch (city) {
+      case "HANOI":
       case "Hanoi":
         return "Hà Nội";
       case "HCMC":
         return "TP. Hồ Chí Minh";
+      case "DANANG":
       case "Da Nang":
         return "Đà Nẵng";
       default:
@@ -253,9 +360,20 @@ export default function ConsignmentManagement() {
               </CardHeader>
               <CardContent>
             {/* Filters for CREATED consignments */}
-            <div className="flex gap-4 mb-6">
+            <div className="space-y-4 mb-6">
+              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+                <div>
+                  <Label htmlFor="created-code-filter">Mã lô hàng</Label>
+                  <Input
+                    id="created-code-filter"
+                    placeholder="Nhập mã lô hàng"
+                    value={createdCodeFilter || ''}
+                    onChange={(e) => setCreatedCodeFilter(e.target.value || undefined)}
+                  />
+                </div>
               {userRole === 'admin' && (
-                <div className="flex-1">
+                  <>
+                    <div>
                   <Label htmlFor="created-city-filter">Thành phố</Label>
                   <Select
                     value={createdConsignmentCityFilter || 'all'}
@@ -272,7 +390,78 @@ export default function ConsignmentManagement() {
                     </SelectContent>
                   </Select>
                 </div>
-              )}
+                    <div>
+                      <Label htmlFor="created-warehouse-filter">Kho</Label>
+                      <Select
+                        value={createdWarehouseFilter || 'all'}
+                        onValueChange={(value) => setCreatedWarehouseFilter(value === 'all' ? undefined : value)}
+                      >
+                        <SelectTrigger id="created-warehouse-filter">
+                          <SelectValue placeholder="Tất cả kho" />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="all">Tất cả kho</SelectItem>
+                          <SelectItem value="WH-HN-001">WH-HN-001</SelectItem>
+                          <SelectItem value="WH-DN-001">WH-DN-001</SelectItem>
+                          <SelectItem value="WH-HCM-001">WH-HCM-001</SelectItem>
+                        </SelectContent>
+                      </Select>
+                    </div>
+                  </>
+                )}
+              </div>
+              <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+                <div>
+                  <Label htmlFor="created-start-date">Từ ngày</Label>
+                  <Input
+                    id="created-start-date"
+                    type="date"
+                    value={createdStartDateFilter || ''}
+                    onChange={(e) => setCreatedStartDateFilter(e.target.value || undefined)}
+                  />
+                </div>
+                <div>
+                  <Label htmlFor="created-end-date">Đến ngày</Label>
+                  <Input
+                    id="created-end-date"
+                    type="date"
+                    value={createdEndDateFilter || ''}
+                    onChange={(e) => setCreatedEndDateFilter(e.target.value || undefined)}
+                    min={createdStartDateFilter || undefined}
+                  />
+                </div>
+                <div>
+                  <Label htmlFor="created-sort">Sắp xếp</Label>
+                  <Select
+                    value={createdSortOrder}
+                    onValueChange={(value) => setCreatedSortOrder(value as 'asc' | 'desc')}
+                  >
+                    <SelectTrigger id="created-sort">
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="desc">Mới nhất</SelectItem>
+                      <SelectItem value="asc">Cũ nhất</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+                <div className="flex items-end">
+                  <Button
+                    variant="outline"
+                    onClick={() => {
+                      setCreatedCodeFilter(undefined);
+                      setCreatedConsignmentCityFilter(userRole === 'store_manager' ? userCity : undefined);
+                      setCreatedWarehouseFilter(undefined);
+                      setCreatedStartDateFilter(undefined);
+                      setCreatedEndDateFilter(undefined);
+                      setCreatedSortOrder('desc');
+                    }}
+                  >
+                    <X className="h-4 w-4 mr-2" />
+                    Xóa bộ lọc
+                  </Button>
+                </div>
+              </div>
             </div>
 
             {/* CREATED Consignments Table */}
@@ -292,8 +481,10 @@ export default function ConsignmentManagement() {
                     <TableRow>
                       <TableHead>Mã lô hàng</TableHead>
                       <TableHead>Đơn hàng</TableHead>
-                      <TableHead>Khách hàng</TableHead>
                       <TableHead>Kho</TableHead>
+                      <TableHead>Trạng thái</TableHead>
+                      <TableHead>Mã vận đơn</TableHead>
+                      <TableHead>Thời gian tạo</TableHead>
                       <TableHead>Số lượng sản phẩm</TableHead>
                       <TableHead>Tổng tiền</TableHead>
                       <TableHead className="text-right">Thao tác</TableHead>
@@ -304,25 +495,45 @@ export default function ConsignmentManagement() {
                       <TableRow key={consignment.id}>
                         <TableCell className="font-medium">{consignment.code}</TableCell>
                         <TableCell>{consignment.orderNumber}</TableCell>
-                        <TableCell>
-                          <div>
-                            <div className="font-medium">{consignment.customerName || '-'}</div>
-                            <div className="text-xs text-muted-foreground">{consignment.customerEmail || '-'}</div>
-                          </div>
-                        </TableCell>
                         <TableCell>{getCityLabel(consignment.warehouseCity)}</TableCell>
+                        <TableCell>
+                          <Badge variant={getStatusBadgeVariant(consignment.status)}>
+                            {getStatusLabel(consignment.status)}
+                          </Badge>
+                        </TableCell>
+                        <TableCell>{consignment.trackingNumber || "-"}</TableCell>
+                        <TableCell>{formatDateTime(consignment.createdAt)}</TableCell>
                         <TableCell>{consignment.entries?.length || 0}</TableCell>
                         <TableCell>{consignment.totalPrice?.toLocaleString('vi-VN') || 0} VNĐ</TableCell>
                         <TableCell className="text-right">
+                          <div className="flex justify-end gap-2">
+                            <Button
+                              variant="ghost"
+                              size="sm"
+                              className="border-0 h-8 w-8 p-0"
+                              title="Xem chi tiết"
+                              onClick={() => {
+                                setSelectedSaleOrderId(consignment.id);
+                                setSaleOrderDetailsDialogOpen(true);
+                              }}
+                            >
+                              <Eye className="h-4 w-4" />
+                            </Button>
                           <Button
-                            variant="outline"
+                              variant="ghost"
                             size="sm"
+                              className="border-0 h-8 w-8 p-0"
+                              title={consignment.status === 'CREATED' ? "Tạo đơn vận chuyển" : "Chỉ có thể tạo đơn vận chuyển khi trạng thái là 'Đã tạo'"}
                             onClick={() => handleCreateShippingOrder(consignment.id)}
-                            disabled={createShippingOrderMutation.isPending}
+                              disabled={consignment.status !== 'CREATED' || createShippingOrderMutation.isPending}
                           >
-                            <Package className="h-4 w-4 mr-1" />
-                            {createShippingOrderMutation.isPending ? "Đang tạo..." : "Tạo đơn vận chuyển"}
+                              {createShippingOrderMutation.isPending ? (
+                                <Loader2 className="h-4 w-4 animate-spin" />
+                              ) : (
+                                <Package className="h-4 w-4" />
+                              )}
                           </Button>
+                          </div>
                         </TableCell>
                       </TableRow>
                     ))}
@@ -374,9 +585,20 @@ export default function ConsignmentManagement() {
               </CardHeader>
               <CardContent>
             {/* Filters */}
-            <div className="flex gap-4 mb-6">
+            <div className="space-y-4 mb-6">
+              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+                <div>
+                  <Label htmlFor="code-filter">Mã lô hàng</Label>
+                  <Input
+                    id="code-filter"
+                    placeholder="Nhập mã lô hàng"
+                    value={codeFilter || ''}
+                    onChange={(e) => setCodeFilter(e.target.value || undefined)}
+                  />
+                </div>
               {userRole === 'admin' && (
-                <div className="flex-1">
+                  <>
+                    <div>
                   <Label htmlFor="city-filter">Thành phố</Label>
                   <Select
                     value={consignmentCityFilter || 'all'}
@@ -393,12 +615,30 @@ export default function ConsignmentManagement() {
                     </SelectContent>
                   </Select>
                 </div>
-              )}
-              <div className="flex-1">
+                    <div>
+                      <Label htmlFor="warehouse-filter">Kho</Label>
+                      <Select
+                        value={warehouseFilter || 'all'}
+                        onValueChange={(value) => setWarehouseFilter(value === 'all' ? undefined : value)}
+                      >
+                        <SelectTrigger id="warehouse-filter">
+                          <SelectValue placeholder="Tất cả kho" />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="all">Tất cả kho</SelectItem>
+                          <SelectItem value="WH-HN-001">WH-HN-001</SelectItem>
+                          <SelectItem value="WH-DN-001">WH-DN-001</SelectItem>
+                          <SelectItem value="WH-HCM-001">WH-HCM-001</SelectItem>
+                        </SelectContent>
+                      </Select>
+                    </div>
+                  </>
+                )}
+                <div>
                 <Label htmlFor="status-filter">Trạng thái</Label>
                 <Select
                   value={consignmentStatusFilter || 'all'}
-                  onValueChange={(value) => setConsignmentStatusFilter(value === 'all' ? undefined : value as ConsignmentStatus)}
+                    onValueChange={(value) => setConsignmentStatusFilter(value === 'all' ? undefined : value as SaleOrderStatus)}
                 >
                   <SelectTrigger id="status-filter">
                     <SelectValue placeholder="Tất cả trạng thái" />
@@ -415,6 +655,60 @@ export default function ConsignmentManagement() {
                       <SelectItem value="RETURNED">Đã trả hàng</SelectItem>
                     </SelectContent>
                 </Select>
+                </div>
+              </div>
+              <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+                <div>
+                  <Label htmlFor="start-date">Từ ngày</Label>
+                  <Input
+                    id="start-date"
+                    type="date"
+                    value={startDateFilter || ''}
+                    onChange={(e) => setStartDateFilter(e.target.value || undefined)}
+                  />
+                </div>
+                <div>
+                  <Label htmlFor="end-date">Đến ngày</Label>
+                  <Input
+                    id="end-date"
+                    type="date"
+                    value={endDateFilter || ''}
+                    onChange={(e) => setEndDateFilter(e.target.value || undefined)}
+                    min={startDateFilter || undefined}
+                  />
+                </div>
+                <div>
+                  <Label htmlFor="sort">Sắp xếp</Label>
+                  <Select
+                    value={sortOrder}
+                    onValueChange={(value) => setSortOrder(value as 'asc' | 'desc')}
+                  >
+                    <SelectTrigger id="sort">
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="desc">Mới nhất</SelectItem>
+                      <SelectItem value="asc">Cũ nhất</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+                <div className="flex items-end">
+                  <Button
+                    variant="outline"
+                    onClick={() => {
+                      setCodeFilter(undefined);
+                      setConsignmentCityFilter(userRole === 'store_manager' ? userCity : undefined);
+                      setWarehouseFilter(undefined);
+                      setConsignmentStatusFilter('PENDING');
+                      setStartDateFilter(undefined);
+                      setEndDateFilter(undefined);
+                      setSortOrder('desc');
+                    }}
+                  >
+                    <X className="h-4 w-4 mr-2" />
+                    Xóa bộ lọc
+                  </Button>
+                </div>
               </div>
             </div>
 
@@ -435,10 +729,10 @@ export default function ConsignmentManagement() {
                     <TableRow>
                       <TableHead>Mã lô hàng</TableHead>
                       <TableHead>Đơn hàng</TableHead>
-                      <TableHead>Khách hàng</TableHead>
                       <TableHead>Kho</TableHead>
                       <TableHead>Trạng thái</TableHead>
                       <TableHead>Mã vận đơn</TableHead>
+                      <TableHead>Thời gian tạo</TableHead>
                       <TableHead>Số lượng sản phẩm</TableHead>
                       <TableHead>Tổng tiền</TableHead>
                       <TableHead className="text-right">Thao tác</TableHead>
@@ -449,12 +743,6 @@ export default function ConsignmentManagement() {
                       <TableRow key={consignment.id}>
                         <TableCell className="font-medium">{consignment.code}</TableCell>
                         <TableCell>{consignment.orderNumber}</TableCell>
-                        <TableCell>
-                          <div>
-                            <div className="font-medium">{consignment.customerName || '-'}</div>
-                            <div className="text-xs text-muted-foreground">{consignment.customerEmail || '-'}</div>
-                          </div>
-                        </TableCell>
                         <TableCell>{getCityLabel(consignment.warehouseCity)}</TableCell>
                         <TableCell>
                           <Badge variant={getStatusBadgeVariant(consignment.status)}>
@@ -462,20 +750,54 @@ export default function ConsignmentManagement() {
                           </Badge>
                         </TableCell>
                         <TableCell>{consignment.trackingNumber || "-"}</TableCell>
+                        <TableCell>{formatDateTime(consignment.createdAt)}</TableCell>
                         <TableCell>{consignment.entries?.length || 0}</TableCell>
                         <TableCell>{consignment.totalPrice?.toLocaleString('vi-VN') || 0} VNĐ</TableCell>
                         <TableCell className="text-right">
+                          <div className="flex justify-end gap-2">
+                            <Button
+                              variant="ghost"
+                              size="sm"
+                              className="border-0 h-8 w-8 p-0"
+                              title="Xem chi tiết"
+                              onClick={() => {
+                                setSelectedSaleOrderId(consignment.id);
+                                setSaleOrderDetailsDialogOpen(true);
+                              }}
+                            >
+                              <Eye className="h-4 w-4" />
+                            </Button>
+                            <Button
+                              variant="ghost"
+                              size="sm"
+                              className="border-0 h-8 w-8 p-0"
+                              title={consignment.status === 'CREATED' ? "Tạo đơn vận chuyển" : "Chỉ có thể tạo đơn vận chuyển khi trạng thái là 'Đã tạo'"}
+                              onClick={() => handleCreateShippingOrder(consignment.id)}
+                              disabled={consignment.status !== 'CREATED' || createShippingOrderMutation.isPending}
+                            >
+                              {createShippingOrderMutation.isPending ? (
+                                <Loader2 className="h-4 w-4 animate-spin" />
+                              ) : (
+                                <Package className="h-4 w-4" />
+                              )}
+                            </Button>
                           {consignment.status === 'PENDING' && (
                             <Button
-                              variant="outline"
+                                variant="ghost"
                               size="sm"
+                                className="border-0 h-8 w-8 p-0"
+                                title="Gửi hàng"
                               onClick={() => handleShipConsignment(consignment)}
                               disabled={shipConsignmentMutation.isPending}
                             >
-                              <Ship className="h-4 w-4 mr-1" />
-                              Gửi hàng
+                                {shipConsignmentMutation.isPending ? (
+                                  <Loader2 className="h-4 w-4 animate-spin" />
+                                ) : (
+                                  <Ship className="h-4 w-4" />
+                                )}
                             </Button>
                           )}
+                          </div>
                         </TableCell>
                       </TableRow>
                     ))}
@@ -556,6 +878,151 @@ export default function ConsignmentManagement() {
                 )}
               </Button>
             </form>
+          </DialogContent>
+        </Dialog>
+
+        {/* Sale Order Details Dialog */}
+        <Dialog open={saleOrderDetailsDialogOpen} onOpenChange={setSaleOrderDetailsDialogOpen}>
+          <DialogContent className="max-w-4xl max-h-[90vh] overflow-y-auto">
+            <DialogHeader>
+              <DialogTitle>Chi tiết lô hàng</DialogTitle>
+              <DialogDescription>
+                Thông tin chi tiết của lô hàng
+              </DialogDescription>
+            </DialogHeader>
+            {isLoadingSaleOrderDetails ? (
+              <div className="text-center py-8">
+                <Loader2 className="h-8 w-8 animate-spin mx-auto" />
+                <p className="mt-2 text-muted-foreground">Đang tải...</p>
+              </div>
+            ) : saleOrderDetails ? (
+              <div className="space-y-6">
+                {/* Basic Information */}
+                <div className="grid grid-cols-2 gap-4">
+                  <div>
+                    <Label className="text-sm font-medium text-muted-foreground">Mã lô hàng</Label>
+                    <p className="font-semibold">{saleOrderDetails.code}</p>
+                  </div>
+                  <div>
+                    <Label className="text-sm font-medium text-muted-foreground">Đơn hàng</Label>
+                    <p>{saleOrderDetails.orderNumber}</p>
+                  </div>
+                  <div>
+                    <Label className="text-sm font-medium text-muted-foreground">Trạng thái</Label>
+                    <div>
+                      <Badge variant={getStatusBadgeVariant(saleOrderDetails.status)}>
+                        {getStatusLabel(saleOrderDetails.status)}
+                      </Badge>
+                    </div>
+                  </div>
+                  <div>
+                    <Label className="text-sm font-medium text-muted-foreground">Kho</Label>
+                    <p>{getCityLabel(saleOrderDetails.warehouseCity || '')} - {saleOrderDetails.warehouseCode}</p>
+                  </div>
+                  <div>
+                    <Label className="text-sm font-medium text-muted-foreground">Mã vận đơn</Label>
+                    <p>{saleOrderDetails.trackingNumber || "-"}</p>
+                  </div>
+                  <div>
+                    <Label className="text-sm font-medium text-muted-foreground">Thời gian tạo</Label>
+                    <p>{formatDateTime(saleOrderDetails.createdAt)}</p>
+                  </div>
+                  <div>
+                    <Label className="text-sm font-medium text-muted-foreground">Tổng tiền</Label>
+                    <p className="font-semibold">{saleOrderDetails.totalPrice?.toLocaleString('vi-VN') || 0} VNĐ</p>
+                  </div>
+                  <div>
+                    <Label className="text-sm font-medium text-muted-foreground">Phí vận chuyển</Label>
+                    <p>{saleOrderDetails.shippingAmount?.toLocaleString('vi-VN') || 0} VNĐ</p>
+                  </div>
+                  <div>
+                    <Label className="text-sm font-medium text-muted-foreground">COD</Label>
+                    <p>{saleOrderDetails.codAmount?.toLocaleString('vi-VN') || 0} VNĐ</p>
+                  </div>
+                </div>
+
+                {/* Customer Information */}
+                <div>
+                  <Label className="text-sm font-medium text-muted-foreground mb-3 block">Thông tin khách hàng</Label>
+                  <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                    <div>
+                      <Label className="text-sm font-medium text-muted-foreground">Tên khách hàng</Label>
+                      <p>{saleOrderDetails.customerName || '-'}</p>
+                    </div>
+                    <div>
+                      <Label className="text-sm font-medium text-muted-foreground">Số điện thoại</Label>
+                      <p>{saleOrderDetails.customerPhone || '-'}</p>
+                    </div>
+                    <div>
+                      <Label className="text-sm font-medium text-muted-foreground">Địa chỉ giao hàng</Label>
+                      <p className="break-words">{saleOrderDetails.formattedShippingAddress || '-'}</p>
+                    </div>
+                  </div>
+                </div>
+
+                {/* Entries */}
+                {saleOrderDetails.entries && saleOrderDetails.entries.length > 0 && (
+                  <div>
+                    <Label className="text-sm font-medium text-muted-foreground mb-2 block">Danh sách sản phẩm</Label>
+                    <Table>
+                      <TableHeader>
+                        <TableRow>
+                          <TableHead>Sản phẩm</TableHead>
+                          <TableHead>SKU</TableHead>
+                          <TableHead>Số lượng</TableHead>
+                          <TableHead>Đã giao</TableHead>
+                          <TableHead>Trọng lượng</TableHead>
+                          <TableHead>Kích thước</TableHead>
+                          <TableHead>Đơn giá</TableHead>
+                          <TableHead>Thành tiền</TableHead>
+                        </TableRow>
+                      </TableHeader>
+                      <TableBody>
+                        {saleOrderDetails.entries.map((entry) => {
+                          const dimensions = [];
+                          if (entry.length) dimensions.push(`${entry.length}cm`);
+                          if (entry.width) dimensions.push(`${entry.width}cm`);
+                          if (entry.height) dimensions.push(`${entry.height}cm`);
+                          const dimensionStr = dimensions.length > 0 ? dimensions.join(' x ') : '-';
+                          
+                          return (
+                            <TableRow key={entry.id}>
+                              <TableCell>
+                                <div>
+                                  <div className="font-medium">{entry.bookTitle || entry.sku || '-'}</div>
+                                  {entry.bookCode && (
+                                    <div className="text-xs text-muted-foreground">Mã: {entry.bookCode}</div>
+                                  )}
+                                </div>
+                              </TableCell>
+                              <TableCell>{entry.sku}</TableCell>
+                              <TableCell>{entry.quantity}</TableCell>
+                              <TableCell>{entry.shippedQuantity || 0}</TableCell>
+                              <TableCell>{entry.weight ? `${entry.weight}g` : '-'}</TableCell>
+                              <TableCell>{dimensionStr}</TableCell>
+                              <TableCell>{entry.unitPrice?.toLocaleString('vi-VN') || 0} VNĐ</TableCell>
+                              <TableCell>{entry.totalPrice?.toLocaleString('vi-VN') || 0} VNĐ</TableCell>
+                            </TableRow>
+                          );
+                        })}
+                      </TableBody>
+                    </Table>
+                  </div>
+                )}
+
+                {/* Notes */}
+                {saleOrderDetails.notes && (
+                  <div>
+                    <Label className="text-sm font-medium text-muted-foreground">Ghi chú</Label>
+                    <p className="mt-1">{saleOrderDetails.notes}</p>
+                  </div>
+                )}
+              </div>
+            ) : (
+              <div className="text-center py-8">
+                <p className="text-muted-foreground">Không tìm thấy thông tin lô hàng</p>
+              </div>
+            )}
           </DialogContent>
         </Dialog>
       </main>

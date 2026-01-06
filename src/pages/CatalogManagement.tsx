@@ -119,7 +119,7 @@ export default function CatalogManagement() {
   const { data: authors = [], isLoading: isLoadingAuthors, error: authorsError, refetch: refetchAuthors } = useQuery({
     queryKey: ['authors'],
     queryFn: () => CatalogService.getInstance().getAllAuthors(),
-    enabled: activeTab === 'authors' || activeTab === 'books', // Also load when books tab is active (needed for book form)
+    enabled: activeTab === 'authors' || (activeTab === 'books' && dialogOpen), // Only load when authors tab is active or when book form dialog is open
   });
 
   useEffect(() => {
@@ -136,7 +136,7 @@ export default function CatalogManagement() {
   const { data: genres = [], isLoading: isLoadingGenres, error: genresError, refetch: refetchGenres } = useQuery({
     queryKey: ['genres'],
     queryFn: () => CatalogService.getInstance().getAllGenres(),
-    enabled: activeTab === 'genres' || activeTab === 'books', // Also load when books tab is active (needed for book form)
+    enabled: activeTab === 'genres' || (activeTab === 'books' && dialogOpen), // Only load when genres tab is active or when book form dialog is open
   });
 
   useEffect(() => {
@@ -153,14 +153,14 @@ export default function CatalogManagement() {
   const { data: publishers = [] } = useQuery({
     queryKey: ['publishers'],
     queryFn: () => CatalogService.getInstance().getAllPublishers(),
-    enabled: activeTab === 'books', // Only load when books tab is active (needed for book form)
+    enabled: activeTab === 'books' && dialogOpen, // Only load when book form dialog is open
   });
 
   // Translators (only needed for book form)
   const { data: translators = [], isLoading: isLoadingTranslators } = useQuery({
     queryKey: ['translators'],
     queryFn: () => CatalogService.getInstance().getAllTranslators(),
-    enabled: activeTab === 'books', // Only load when books tab is active (needed for book form)
+    enabled: activeTab === 'books' && dialogOpen,
   });
 
   // Delete mutations
@@ -582,37 +582,37 @@ export default function CatalogManagement() {
                 </TabsList>
 
                 <TabsContent value="books" className="mt-4">
-                  <div className="flex justify-end mb-4">
-                    <BookFormDialog
-                      open={dialogOpen}
-                      onOpenChange={setDialogOpen}
-                      formData={formData}
-                      onFormDataChange={setFormData}
-                      imagePreviews={imagePreviews}
-                      onImageSelect={handleImageSelect}
-                      onImageRemove={removeImage}
-                      authors={authors as Author[]}
-                      isLoadingAuthors={isLoadingAuthors}
-                      translators={translators as Translator[]}
-                      isLoadingTranslators={isLoadingTranslators}
-                      publishers={publishers as Publisher[]}
-                      genres={genres as Genre[]}
-                      isLoadingGenres={isLoadingGenres}
-                      onToggleAuthor={toggleAuthor}
-                      onToggleTranslator={toggleTranslator}
-                      onToggleGenre={toggleGenre}
-                      onSubmit={handleSubmit}
-                      isSubmitting={createBookMutation.isPending}
-                            />
-                          </div>
-                <BooksTable
-                  books={books as Book[]}
-                  isLoading={isLoadingBooks}
-                  error={booksError}
-                  onViewDetails={handleViewBookDetails}
-                  onDelete={(bookId, bookTitle) => handleDelete("book", bookId, bookTitle)}
-                />
-              </TabsContent>
+                    <div className="flex justify-end mb-4">
+                      <BookFormDialog
+                        open={dialogOpen}
+                        onOpenChange={setDialogOpen}
+                        formData={formData}
+                        onFormDataChange={setFormData}
+                        imagePreviews={imagePreviews}
+                        onImageSelect={handleImageSelect}
+                        onImageRemove={removeImage}
+                        authors={authors as Author[]}
+                        isLoadingAuthors={isLoadingAuthors}
+                        translators={translators as Translator[]}
+                        isLoadingTranslators={isLoadingTranslators}
+                        publishers={publishers as Publisher[]}
+                        genres={genres as Genre[]}
+                        isLoadingGenres={isLoadingGenres}
+                        onToggleAuthor={toggleAuthor}
+                        onToggleTranslator={toggleTranslator}
+                        onToggleGenre={toggleGenre}
+                        onSubmit={handleSubmit}
+                        isSubmitting={createBookMutation.isPending}
+                              />
+                            </div>
+                  <BooksTable
+                    books={books as Book[]}
+                    isLoading={isLoadingBooks}
+                    error={booksError}
+                    onViewDetails={handleViewBookDetails}
+                    onDelete={(bookId, bookTitle) => handleDelete("book", bookId, bookTitle)}
+                  />
+                </TabsContent>
 
               <TabsContent value="authors" className="mt-4">
                 <div className="flex justify-end mb-4">

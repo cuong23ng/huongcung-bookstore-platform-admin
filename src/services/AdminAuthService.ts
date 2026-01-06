@@ -20,8 +20,7 @@ export class AdminAuthService {
 
   public async login(data: LoginRequest): Promise<AuthResponse> {
     try {
-      // Backend returns LoginResponse directly, not wrapped in ApiResponse
-      const response = await this.apiFetcher.post<AuthResponse>('/auth/login', data);
+      const response = await this.apiFetcher.post<AuthResponse>('/admin/auth/login', data);
       const authData = response.data;
       this.saveAuthData(authData);
       return authData;
@@ -45,7 +44,7 @@ export class AdminAuthService {
 
     if (token && tokenType) {
       try {
-        await this.apiFetcher.post('/auth/logout', {});
+        await this.apiFetcher.post('/admin/auth/logout', {});
       } catch (error) {
         // Even if logout API call fails, clear local auth data
         console.error('Logout API call failed:', error);
@@ -68,15 +67,11 @@ export class AdminAuthService {
     localStorage.setItem('admin_tokenType', authData.type || 'Bearer');
     localStorage.setItem('admin_userId', authData.id.toString());
     localStorage.setItem('admin_userEmail', authData.email);
+    localStorage.setItem('admin_userUsername', authData.username);
     localStorage.setItem('admin_userFirstName', authData.firstName);
     localStorage.setItem('admin_userLastName', authData.lastName);
     localStorage.setItem('admin_userRoles', JSON.stringify(authData.roles));
-    localStorage.setItem('admin_userType', authData.userType);
-    
-    // Store city if provided (for Store Managers)
-    if (authData.city) {
-      localStorage.setItem('admin_userCity', authData.city);
-    }
+    // Note: userType and city are not in AuthResponse, removed from storage
   }
 
   private clearAuthData(): void {
@@ -84,11 +79,10 @@ export class AdminAuthService {
     localStorage.removeItem('admin_tokenType');
     localStorage.removeItem('admin_userId');
     localStorage.removeItem('admin_userEmail');
+    localStorage.removeItem('admin_userUsername');
     localStorage.removeItem('admin_userFirstName');
     localStorage.removeItem('admin_userLastName');
     localStorage.removeItem('admin_userRoles');
-    localStorage.removeItem('admin_userType');
-    localStorage.removeItem('admin_userCity');
   }
 
   public getAuthData(): AdminUserInfo | null {
@@ -104,8 +98,6 @@ export class AdminAuthService {
     const firstName = localStorage.getItem('admin_userFirstName');
     const lastName = localStorage.getItem('admin_userLastName');
     const roles = localStorage.getItem('admin_userRoles');
-    const userType = localStorage.getItem('admin_userType');
-    const city = localStorage.getItem('admin_userCity');
 
     if (!userId || !email) {
       return null;
@@ -117,8 +109,8 @@ export class AdminAuthService {
       firstName: firstName || '',
       lastName: lastName || '',
       roles: roles ? JSON.parse(roles) : [],
-      userType: userType || '',
-      city: city || undefined,
+      // Note: userType and city are not available from AuthResponse
+      // They may need to be fetched from a separate user profile endpoint if required
     };
   }
 }

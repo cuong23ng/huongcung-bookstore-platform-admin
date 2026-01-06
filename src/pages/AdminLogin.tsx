@@ -11,7 +11,7 @@ import type { LoginRequest } from "../models/AdminAuth";
 export default function AdminLogin() {
   const navigate = useNavigate();
   const { toast } = useToast();
-  const [email, setEmail] = useState("");
+  const [username, setUsername] = useState("");
   const [password, setPassword] = useState("");
   const [loading, setLoading] = useState(false);
 
@@ -28,7 +28,7 @@ export default function AdminLogin() {
     setLoading(true);
 
     // Basic form validation
-    if (!email || !password) {
+    if (!username || !password) {
       toast({
         title: "Lỗi đăng nhập",
         description: "Vui lòng điền đầy đủ thông tin",
@@ -38,21 +38,9 @@ export default function AdminLogin() {
       return;
     }
 
-    // Email format validation
-    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-    if (!emailRegex.test(email)) {
-      toast({
-        title: "Lỗi đăng nhập",
-        description: "Email không hợp lệ",
-        variant: "destructive",
-      });
-      setLoading(false);
-      return;
-    }
-
     try {
       const authService = AdminAuthService.getInstance();
-      const loginData: LoginRequest = { email, password };
+      const loginData: LoginRequest = { username, password };
       const authData = await authService.login(loginData);
 
       toast({
@@ -84,13 +72,13 @@ export default function AdminLogin() {
         <CardContent>
           <form onSubmit={handleLogin} className="space-y-4">
             <div className="space-y-2">
-              <Label htmlFor="email">Email</Label>
+              <Label htmlFor="username">Tên đăng nhập</Label>
               <Input
-                id="email"
-                type="email"
-                placeholder="email@example.com"
-                value={email}
-                onChange={(e) => setEmail(e.target.value)}
+                id="username"
+                type="text"
+                placeholder="Nhập tên đăng nhập"
+                value={username}
+                onChange={(e) => setUsername(e.target.value)}
                 required
               />
             </div>

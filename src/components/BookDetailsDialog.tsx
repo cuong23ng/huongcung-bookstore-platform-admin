@@ -516,7 +516,7 @@ export function BookDetailsDialog({
             </div>
 
             {/* Physical Book Information */}
-            {bookDetails.hasPhysicalEdition && bookDetails.physicalBookInfo && (
+            {bookDetails.physicalBookInfo && (
               <div className="space-y-4">
                 <h3 className="text-lg font-semibold border-b pb-2">Thông tin sách giấy</h3>
                 <div className="grid grid-cols-2 gap-4">
@@ -579,7 +579,7 @@ export function BookDetailsDialog({
             )}
 
             {/* Ebook Information */}
-            {bookDetails.hasEbookEdition && bookDetails.ebookInfo && (
+            {bookDetails.ebookInfo && (
               <div className="space-y-4">
                 <h3 className="text-lg font-semibold border-b pb-2">Thông tin sách điện tử</h3>
                 <div className="grid grid-cols-2 gap-4">
@@ -606,7 +606,7 @@ export function BookDetailsDialog({
             )}
 
             {/* Review Section */}
-            <div className="space-y-4">
+            {/* <div className="space-y-4">
               <div className="flex items-center justify-between border-b pb-2">
                 <div className="flex items-center gap-3">
                   <h3 className="text-lg font-semibold">Đánh giá sách</h3>
@@ -878,7 +878,7 @@ export function BookDetailsDialog({
                   </CardContent>
                 </Card>
               )}
-            </div>
+            </div> */}
           </div>
         )}
         {!isLoadingBookDetails && !bookDetails && (

@@ -1,7 +1,8 @@
-import { City } from './Staff';
+import type { City } from './Staff';
 
 export type OrderStatus = 'PENDING' | 'CONFIRMED' | 'PROCESSING' | 'SHIPPED' | 'DELIVERED' | 'CANCELLED';
 export type ConsignmentStatus = 'CREATED' | 'PENDING' | 'PICKED_UP' | 'IN_TRANSIT' | 'OUT_FOR_DELIVERY' | 'DELIVERED' | 'FAILED_DELIVERY' | 'RETURNED';
+export type SaleOrderStatus = 'CREATED' | 'PENDING' | 'PICKED_UP' | 'IN_TRANSIT' | 'OUT_FOR_DELIVERY' | 'DELIVERED' | 'FAILED_DELIVERY' | 'RETURNED';
 
 export interface OrderItem {
   id: number;
@@ -140,6 +141,59 @@ export interface ConsignmentShipRequest {
 
 export interface PaginatedConsignmentResponse {
   consignments: Consignment[];
+  pagination: {
+    page: number;
+    size: number;
+    totalElements: number;
+    totalPages: number;
+  };
+}
+
+export interface SaleOrderEntry {
+  id: number;
+  sku: string;
+  unitPrice: number;
+  totalPrice: number;
+  quantity: number;
+  shippedQuantity: number;
+  bookId?: number;
+  bookTitle?: string;
+  bookCode?: string;
+  weight?: number;
+  length?: number;
+  height?: number;
+  width?: number;
+}
+
+export interface SaleOrder {
+  id: number;
+  code: string;
+  orderId?: number;
+  orderNumber: string;
+  status: SaleOrderStatus;
+  trackingNumber?: string;
+  shippingCompany?: string;
+  estimatedDeliveryDate?: string;
+  actualDeliveryDate?: string;
+  shippingAddress?: Record<string, any>;
+  notes?: string;
+  totalPrice: number;
+  shippingAmount?: number;
+  codAmount: number;
+  warehouseCity: City;
+  warehouseId: number;
+  warehouseCode?: string;
+  customerName?: string;
+  customerPhone?: string;
+  customerEmail?: string;
+  formattedShippingAddress?: string;
+  entries: SaleOrderEntry[];
+  createdAt: string;
+  updatedAt?: string;
+}
+
+export interface PaginatedSaleOrdersResponse {
+  saleOrders: SaleOrder[];
   pagination: {
     page: number;
     size: number;

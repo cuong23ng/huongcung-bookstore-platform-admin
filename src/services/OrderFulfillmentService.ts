@@ -18,68 +18,57 @@ export class OrderFulfillmentService {
    * Get fulfillment queue with pagination
    * @param page Page number (0-indexed, default: 0)
    * @param size Page size (default: 20)
-   * @param city Optional city filter
-   * @param role Role to determine endpoint ('admin' or 'store_manager')
+   * @param sort Sort order: "createdAt,desc" (newest) or "createdAt,asc" (oldest), default: "createdAt,desc"
    * @returns Paginated orders response
    */
   public async getFulfillmentQueue(
     page: number = 0,
     size: number = 20,
-    city?: City,
-    role: 'admin' | 'store_manager' = 'store_manager'
+    sort: string = "createdAt,desc"
   ): Promise<{ orders: Order[]; pagination: { page: number; size: number; totalElements: number; totalPages: number } }> {
     try {
-      // Determine endpoint based on role
-      const endpoint = role === 'admin'
-        ? '/admin/orders/fulfillment-queue'
-        : '/store-manager/orders/fulfillment-queue';
+      const endpoint = '/admin/order';
       
-      const params: any = { page, size };
-      if (city) {
-        params.city = city;
-      }
+      const params: any = { 
+        page, 
+        size, 
+        status: 'CONFIRMED',
+        sort 
+      };
       
-      // Backend returns BaseResponse with data as a Map containing orders and pagination
+
       const response = await this.apiFetcher.get<any>(endpoint, { params });
       
-      // Check if there's an error code (BaseResponse structure)
       if (response.data.errorCode) {
         throw new Error(response.data.message || 'Failed to fetch fulfillment queue');
       }
 
-      // Extract data from the Map structure
-      const data = response.data.data;
-      if (!data) {
+      const searchResponse = response.data.data;
+      if (!searchResponse) {
         throw new Error(response.data.message || 'No data returned from server');
       }
 
-      // Backend returns: { data: { orders: [...], pagination: {...} } }
-      // Map FulfillmentQueueOrder to Order format for frontend compatibility
-      const fulfillmentOrders: FulfillmentQueueOrder[] = data.orders || [];
-      const orders = fulfillmentOrders.map((fqOrder): Order => ({
-        id: fqOrder.orderId,
-        orderNumber: fqOrder.orderNumber,
-        customerName: fqOrder.customerName,
-        customerEmail: fqOrder.customerEmail,
-        status: 'CONFIRMED' as const, // Fulfillment queue only contains CONFIRMED orders
-        totalAmount: fqOrder.totalAmount,
-        items: fqOrder.fulfillableItems.map(item => ({
-          id: item.entryId,
-          bookId: item.bookId,
-          bookTitle: item.bookTitle,
-          itemType: 'PHYSICAL' as const,
-          quantity: item.requestedQuantity,
-          unitPrice: item.unitPrice,
-          subtotal: item.totalPrice,
-        })),
-        createdAt: fqOrder.orderDate,
+      const pageData = searchResponse.data || {};
+      const orderListDTOs: any[] = pageData.content || [];
+      const paginationInfo = searchResponse.pagination || {};
+
+      // Map OrderListDTO to Order format
+      const orders = orderListDTOs.map((dto): Order => ({
+        id: dto.id,
+        orderNumber: dto.orderNumber,
+        customerName: dto.customerName,
+        customerEmail: dto.customerEmail,
+        status: dto.status || 'CONFIRMED',
+        totalAmount: dto.totalAmount || 0,
+        items: [], // OrderListDTO doesn't include items
+        createdAt: dto.createdAt,
       }));
 
-      const pagination = data.pagination || {
-        page: 0,
-        size: 20,
-        totalElements: 0,
-        totalPages: 0,
+      const pagination = {
+        page: paginationInfo.currentPage !== undefined ? paginationInfo.currentPage : 0,
+        size: paginationInfo.pageSize || 20,
+        totalElements: paginationInfo.totalResults || 0,
+        totalPages: paginationInfo.totalPages || 0,
       };
 
       return {
@@ -101,9 +90,9 @@ export class OrderFulfillmentService {
 
   public async createConsignments(orderId: number): Promise<Consignment[]> {
     try {
-      // Backend returns BaseResponse with data as Consignment[]
+      // Backend returns BaseResponse with message (no data field)
       const response = await this.apiFetcher.post<any>(
-        `/admin/orders/${orderId}/plan-fulfillment`,
+        `/admin/order/${orderId}/allocation/approve`,
         {}
       );
       
@@ -112,13 +101,9 @@ export class OrderFulfillmentService {
         throw new Error(response.data.message || 'Failed to create consignments');
       }
 
-      // Extract data from BaseResponse
-      const data = response.data.data;
-      if (!data) {
-        throw new Error(response.data.message || 'No data returned from server');
-      }
-
-      return Array.isArray(data) ? data : [];
+      // API returns 201 CREATED with message, no data field
+      // Return empty array since consignments are not returned in response
+      return [];
     } catch (error) {
       if (error instanceof AxiosError) {
         const errorMessage = 
@@ -310,42 +295,74 @@ export class OrderFulfillmentService {
    * @param page Page number (0-indexed, default: 0)
    * @param size Page size (default: 20)
    * @param status Optional status filter
-   * @param city Optional city filter
+   * @param orderNumber Optional order number filter
+   * @param customer Optional customer filter (searches name or email)
+   * @param startTime Optional start time filter (format: "yyyy-MM-dd HH:mm:ss")
+   * @param endTime Optional end time filter (format: "yyyy-MM-dd HH:mm:ss")
+   * @param sort Sort order: "createdAt,desc" (newest) or "createdAt,asc" (oldest), default: "createdAt,desc"
    * @returns Paginated orders response
    */
   public async getOrders(
     page: number = 0,
     size: number = 20,
     status?: string,
-    city?: City
+    orderNumber?: string,
+    customer?: string,
+    startTime?: string,
+    endTime?: string,
+    sort: string = "createdAt,desc"
   ): Promise<{ orders: Order[]; pagination: { page: number; size: number; totalElements: number; totalPages: number } }> {
     try {
-      const params: any = { page, size };
+      const params: any = { page, size, sort };
       if (status) {
         params.status = status;
       }
-      if (city) {
-        params.city = city;
+      if (orderNumber) {
+        params.orderNumber = orderNumber;
+      }
+      if (customer) {
+        params.customer = customer;
+      }
+      if (startTime) {
+        params.startTime = startTime;
+      }
+      if (endTime) {
+        params.endTime = endTime;
       }
       
-      const response = await this.apiFetcher.get<any>('/admin/orders', { params });
+      const response = await this.apiFetcher.get<any>('/admin/order', { params });
       
       if (response.data.errorCode) {
         throw new Error(response.data.message || 'Failed to fetch orders');
       }
 
-      const data = response.data.data;
-      if (!data) {
+      // Extract data from SearchResponse structure
+      const searchResponse = response.data.data;
+      if (!searchResponse) {
         throw new Error(response.data.message || 'No data returned from server');
       }
 
-      // Backend returns: { data: { orders: [...], pagination: {...} } }
-      const orders = data.orders || [];
-      const pagination = data.pagination || {
-        page: 0,
-        size: 20,
-        totalElements: 0,
-        totalPages: 0,
+      const pageData = searchResponse.data || {};
+      const orderListDTOs: any[] = pageData.content || [];
+      const paginationInfo = searchResponse.pagination || {};
+
+      // Map OrderListDTO to Order format
+      const orders = orderListDTOs.map((dto): Order => ({
+        id: dto.id,
+        orderNumber: dto.orderNumber,
+        customerName: dto.customerName,
+        customerEmail: dto.customerEmail,
+        status: dto.status,
+        totalAmount: dto.totalAmount || 0,
+        items: [], // OrderListDTO doesn't include items
+        createdAt: dto.createdAt,
+      }));
+
+      const pagination = {
+        page: paginationInfo.currentPage !== undefined ? paginationInfo.currentPage : 0,
+        size: paginationInfo.pageSize || 20,
+        totalElements: paginationInfo.totalResults || 0,
+        totalPages: paginationInfo.totalPages || 0,
       };
 
       return {
@@ -372,7 +389,7 @@ export class OrderFulfillmentService {
    */
   public async getOrderDetails(orderId: number): Promise<OrderDetails> {
     try {
-      const response = await this.apiFetcher.get<any>(`/admin/orders/${orderId}`);
+      const response = await this.apiFetcher.get<any>(`/admin/order/${orderId}`);
       
       if (response.data.errorCode) {
         throw new Error(response.data.message || 'Failed to fetch order details');
@@ -383,8 +400,56 @@ export class OrderFulfillmentService {
         throw new Error(response.data.message || 'No data returned from server');
       }
 
-      // Backend returns: { data: { order: {...} } }
-      return data.order || data;
+      // Backend returns OrderDetailsDTO directly in data field
+      // Map OrderDetailsDTO to OrderDetails interface
+      const orderDetails: OrderDetails = {
+        id: data.id,
+        orderNumber: data.orderNumber,
+        status: data.status,
+        paymentMethod: data.paymentMethod,
+        orderType: data.orderType,
+        totalAmount: data.totalAmount ? Number(data.totalAmount) : 0,
+        subtotal: data.subtotal ? Number(data.subtotal) : 0,
+        shippingAmount: data.shippingAmount ? Number(data.shippingAmount) : 0,
+        taxAmount: data.taxAmount ? Number(data.taxAmount) : 0,
+        discountAmount: data.discountAmount ? Number(data.discountAmount) : 0,
+        createdAt: data.createdAt,
+        updatedAt: data.updatedAt,
+        notes: data.notes,
+        // Map shippingAddress from AddressDTO
+        shippingAddress: data.shippingAddress ? {
+          name: data.shippingAddress.name,
+          phone: data.shippingAddress.phone,
+          address: data.shippingAddress.address,
+          province: data.shippingAddress.province ? {
+            provinceId: data.shippingAddress.province.provinceId,
+            provinceName: data.shippingAddress.province.provinceName,
+          } : undefined,
+          district: data.shippingAddress.district ? {
+            districtId: data.shippingAddress.district.districtId,
+            districtName: data.shippingAddress.district.districtName,
+          } : undefined,
+          ward: data.shippingAddress.ward ? {
+            wardCode: data.shippingAddress.ward.wardCode,
+            wardName: data.shippingAddress.ward.wardName,
+          } : undefined,
+          postalCode: data.shippingAddress.postalCode,
+        } : undefined,
+        // Map items from OrderDetailsItemDTO[]
+        items: data.items ? data.items.map((item: any) => ({
+          id: item.id,
+          bookId: 0, // bookId not available in OrderDetailsItemDTO, using 0 as placeholder
+          bookTitle: item.bookTitle || '',
+          itemType: item.itemType || 'PHYSICAL',
+          quantity: item.quantity || 0,
+          unitPrice: item.unitPrice ? Number(item.unitPrice) : 0,
+          subtotal: item.totalPrice ? Number(item.totalPrice) : 0, // Backend uses totalPrice
+        })) : [],
+        // Keep consignments and deliveryInfo as undefined since they're commented in backend
+        consignments: undefined,
+      };
+
+      return orderDetails;
     } catch (error) {
       if (error instanceof AxiosError) {
         const errorMessage = 

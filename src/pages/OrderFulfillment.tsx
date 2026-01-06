@@ -3,6 +3,7 @@ import { useNavigate } from "react-router-dom";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { Button } from "../components/ui/button";
 import { Label } from "../components/ui/label";
+import { Input } from "../components/ui/input";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "../components/ui/card";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "../components/ui/table";
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "../components/ui/dialog";
@@ -10,10 +11,10 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from ".
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "../components/ui/tabs";
 import { Badge } from "../components/ui/badge";
 import { useToast } from "../hooks/use-toast";
-import { ArrowLeft, Package, Loader2 } from "lucide-react";
+import { ArrowLeft, Package, Loader2, Eye } from "lucide-react";
 import { OrderFulfillmentService } from "../services/OrderFulfillmentService";
 import { getAuthData } from "../services/AdminAuthService";
-import type { Order, OrderDetails, City } from "../models";
+import type { Order, OrderDetails } from "../models";
 
 export default function OrderFulfillment() {
   const navigate = useNavigate();
@@ -35,21 +36,22 @@ export default function OrderFulfillment() {
       userRole = role as 'admin' | 'store_manager';
     }
   }
-  const userCity = userInfo?.city as City | undefined;
-  
   const [activeTab, setActiveTab] = useState("fulfillment-queue");
   const [selectedOrderForDetails, setSelectedOrderForDetails] = useState<number | null>(null);
   const [orderDetailsDialogOpen, setOrderDetailsDialogOpen] = useState(false);
   
-  // Fulfillment queue pagination
+
   const [fulfillmentQueuePage, setFulfillmentQueuePage] = useState(0);
   const [fulfillmentQueuePageSize] = useState(20);
+  const [fulfillmentQueueSort, setFulfillmentQueueSort] = useState<"createdAt,desc" | "createdAt,asc">("createdAt,desc");
   
-  // Orders list filters
+  // Orders list filters, pagination and sort
   const [orderStatusFilter, setOrderStatusFilter] = useState<string | undefined>(undefined);
-  const [orderCityFilter, setOrderCityFilter] = useState<City | undefined>(undefined);
+  const [orderNumberFilter, setOrderNumberFilter] = useState<string>("");
+  const [customerFilter, setCustomerFilter] = useState<string>("");
   const [orderPage, setOrderPage] = useState(0);
   const [orderPageSize] = useState(20);
+  const [orderSort, setOrderSort] = useState<"createdAt,desc" | "createdAt,asc">("createdAt,desc");
 
   // Check access
   useEffect(() => {
@@ -68,32 +70,31 @@ export default function OrderFulfillment() {
     }
   }, [navigate, toast, userInfo, userRole]);
 
-  // Determine city filter: Store Managers see only their city
-  const effectiveCity = userRole === 'store_manager' ? userCity : undefined;
-
   // Fetch fulfillment queue with pagination
   const { data: fulfillmentQueueData, isLoading, error, refetch } = useQuery<{ orders: Order[]; pagination: { page: number; size: number; totalElements: number; totalPages: number } }>({
-    queryKey: ['fulfillmentQueue', effectiveCity, userRole, fulfillmentQueuePage, fulfillmentQueuePageSize],
+    queryKey: ['fulfillmentQueue', fulfillmentQueuePage, fulfillmentQueuePageSize, fulfillmentQueueSort],
     queryFn: () => OrderFulfillmentService.getInstance().getFulfillmentQueue(
       fulfillmentQueuePage,
       fulfillmentQueuePageSize,
-      effectiveCity,
-      userRole
+      fulfillmentQueueSort
     ),
     enabled: activeTab === 'fulfillment-queue',
   });
   
   const orders = fulfillmentQueueData?.orders || [];
 
-
   // Fetch all orders
   const { data: ordersData, isLoading: isLoadingOrders, refetch: refetchOrders } = useQuery<{ orders: Order[]; pagination: { page: number; size: number; totalElements: number; totalPages: number } }>({
-    queryKey: ['allOrders', orderStatusFilter, orderCityFilter, orderPage, orderPageSize],
+    queryKey: ['allOrders', orderStatusFilter, orderNumberFilter, customerFilter, orderPage, orderPageSize, orderSort],
     queryFn: () => OrderFulfillmentService.getInstance().getOrders(
       orderPage,
       orderPageSize,
       orderStatusFilter,
-      orderCityFilter
+      orderNumberFilter || undefined,
+      customerFilter || undefined,
+      undefined,
+      undefined,
+      orderSort
     ),
     enabled: activeTab === 'all-orders',
   });
@@ -111,12 +112,15 @@ export default function OrderFulfillment() {
   const createConsignmentsMutation = useMutation({
     mutationFn: (orderId: number) => 
       OrderFulfillmentService.getInstance().createConsignments(orderId),
-    onSuccess: (data) => {
-      queryClient.invalidateQueries({ queryKey: ['consignments', data[0]?.orderId] });
+    onSuccess: (data, orderId) => {
+      // Invalidate queries to refetch updated data
+      queryClient.invalidateQueries({ queryKey: ['consignments', orderId] });
       queryClient.invalidateQueries({ queryKey: ['fulfillmentQueue'] });
+      queryClient.invalidateQueries({ queryKey: ['orderDetails', orderId] });
+      queryClient.invalidateQueries({ queryKey: ['allOrders'] });
       toast({
         title: "Tạo lô hàng thành công",
-        description: `Đã tạo ${data.length} lô hàng cho đơn hàng`,
+        description: "Đã tạo lô hàng và dự trữ kho cho đơn hàng",
       });
     },
     onError: (error: Error) => {
@@ -137,6 +141,8 @@ export default function OrderFulfillment() {
     switch (status) {
       case "PENDING":
         return "Chờ xử lý";
+        case "WAITING_PAYMENT":
+          return "Chờ thanh toán";
       case "PICKED_UP":
         return "Đã lấy hàng";
       case "IN_TRANSIT":
@@ -227,12 +233,32 @@ export default function OrderFulfillment() {
           <TabsContent value="fulfillment-queue" className="mt-6">
             <Card>
               <CardHeader>
-                <CardTitle>Hàng đợi xử lý</CardTitle>
-                <CardDescription>
-                  {userRole === 'store_manager' 
-                    ? `Đơn hàng tại ${getCityLabel(userCity || '')}` 
-                    : 'Tất cả đơn hàng đã xác nhận'}
-                </CardDescription>
+                <div className="flex justify-between items-start">
+                  <div>
+                    <CardTitle>Hàng đợi xử lý</CardTitle>
+                    <CardDescription>
+                      Tất cả đơn hàng đã xác nhận
+                    </CardDescription>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <Label htmlFor="fulfillment-sort" className="text-sm">Sắp xếp:</Label>
+                    <Select
+                      value={fulfillmentQueueSort}
+                      onValueChange={(value: "createdAt,desc" | "createdAt,asc") => {
+                        setFulfillmentQueueSort(value);
+                        setFulfillmentQueuePage(0);
+                      }}
+                    >
+                      <SelectTrigger id="fulfillment-sort" className="w-[140px]">
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="createdAt,desc">Mới nhất</SelectItem>
+                        <SelectItem value="createdAt,asc">Cũ nhất</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </div>
+                </div>
               </CardHeader>
               <CardContent>
             {isLoading ? (
@@ -253,60 +279,64 @@ export default function OrderFulfillment() {
               </div>
             ) : (
               <>
-                <div className="space-y-6">
-                  {orders.map((order) => (
-                    <Card key={order.id}>
-                      <CardHeader>
-                        <div className="flex justify-between items-start">
+                <Table>
+                  <TableHeader>
+                    <TableRow>
+                      <TableHead>Mã đơn hàng</TableHead>
+                      <TableHead>Khách hàng</TableHead>
+                      <TableHead>Trạng thái</TableHead>
+                      <TableHead>Tổng tiền</TableHead>
+                      <TableHead>Ngày đặt</TableHead>
+                      <TableHead className="text-right">Thao tác</TableHead>
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
+                    {orders.map((order) => (
+                      <TableRow key={order.id}>
+                        <TableCell className="font-medium">{order.orderNumber}</TableCell>
+                        <TableCell>
                           <div>
-                            <CardTitle className="text-lg">Đơn hàng #{order.orderNumber}</CardTitle>
-                            <CardDescription>
-                              Khách hàng: {order.customerName || order.customerEmail} | 
-                              Tổng tiền: {order.totalAmount.toLocaleString('vi-VN')} VNĐ
-                            </CardDescription>
+                            <div className="font-medium">{order.customerName || '-'}</div>
+                            <div className="text-xs text-muted-foreground">{order.customerEmail || '-'}</div>
                           </div>
-                          <Button
-                            onClick={() => {
-                              setSelectedOrderForDetails(order.id);
-                              setOrderDetailsDialogOpen(true);
-                            }}
-                            variant="outline"
-                          >
-                            Xem chi tiết
-                          </Button>
-                        </div>
-                      </CardHeader>
-                      <CardContent>
-                        <div className="space-y-2 mb-4">
-                          <p className="text-sm"><strong>Ngày đặt:</strong> {formatDate(order.createdAt)}</p>
-                          <p className="text-sm"><strong>Trạng thái:</strong> {getStatusLabel(order.status)}</p>
-                          <div className="text-sm">
-                            <strong>Sản phẩm:</strong>
-                            <ul className="list-disc list-inside ml-4">
-                              {order.items.map((item, idx) => (
-                                <li key={idx}>
-                                  {item.bookTitle} x{item.quantity} - {item.subtotal.toLocaleString('vi-VN')} VNĐ
-                                </li>
-                              ))}
-                            </ul>
+                        </TableCell>
+                        <TableCell>
+                          <Badge variant={getStatusBadgeVariant(order.status)}>
+                            {getStatusLabel(order.status)}
+                          </Badge>
+                        </TableCell>
+                        <TableCell>{order.totalAmount?.toLocaleString('vi-VN') || 0} VNĐ</TableCell>
+                        <TableCell>{formatDate(order.createdAt)}</TableCell>
+                        <TableCell className="text-right">
+                          <div className="flex justify-end gap-2">
+                            <Button
+                              variant="ghost"
+                              size="sm"
+                              onClick={() => {
+                                setSelectedOrderForDetails(order.id);
+                                setOrderDetailsDialogOpen(true);
+                              }}
+                              title="Xem chi tiết"
+                              className="border-0"
+                            >
+                              <Eye className="h-4 w-4" />
+                            </Button>
+                            <Button
+                              variant="ghost"
+                              size="sm"
+                              onClick={() => handleCreateConsignments(order.id)}
+                              disabled={createConsignmentsMutation.isPending || order.status !== 'CONFIRMED'}
+                              title="Tạo lô hàng"
+                              className="border-0"
+                            >
+                              <Package className="h-4 w-4" />
+                            </Button>
                           </div>
-                        </div>
-                        
-                        <div className="flex gap-2 mt-4">
-                          <Button
-                            onClick={() => handleCreateConsignments(order.id)}
-                            disabled={createConsignmentsMutation.isPending}
-                            variant="outline"
-                            className="flex-1"
-                          >
-                            <Package className="mr-2 h-4 w-4" />
-                            {createConsignmentsMutation.isPending ? "Đang tạo..." : "Tạo lô hàng"}
-                          </Button>
-                        </div>
-                      </CardContent>
-                    </Card>
-                  ))}
-                </div>
+                        </TableCell>
+                      </TableRow>
+                    ))}
+                  </TableBody>
+                </Table>
 
                 {/* Pagination for fulfillment queue */}
                 {fulfillmentQueueData?.pagination && fulfillmentQueueData.pagination.totalPages > 1 && (
@@ -351,31 +381,39 @@ export default function OrderFulfillment() {
               </CardHeader>
               <CardContent>
                 {/* Filters */}
-                <div className="flex gap-4 mb-6">
-                  {userRole === 'admin' && (
-                    <div className="flex-1">
-                      <Label htmlFor="order-city-filter">Thành phố</Label>
-                      <Select
-                        value={orderCityFilter || 'all'}
-                        onValueChange={(value) => setOrderCityFilter(value === 'all' ? undefined : value as City)}
-                      >
-                        <SelectTrigger id="order-city-filter">
-                          <SelectValue placeholder="Tất cả thành phố" />
-                        </SelectTrigger>
-                        <SelectContent>
-                          <SelectItem value="all">Tất cả thành phố</SelectItem>
-                          <SelectItem value="HANOI">Hà Nội</SelectItem>
-                          <SelectItem value="HCMC">TP. Hồ Chí Minh</SelectItem>
-                          <SelectItem value="DANANG">Đà Nẵng</SelectItem>
-                        </SelectContent>
-                      </Select>
-                    </div>
-                  )}
-                  <div className="flex-1">
+                <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mb-6">
+                  <div>
+                    <Label htmlFor="order-number-filter">Mã đơn hàng</Label>
+                    <Input
+                      id="order-number-filter"
+                      placeholder="Nhập mã đơn hàng"
+                      value={orderNumberFilter}
+                      onChange={(e) => {
+                        setOrderNumberFilter(e.target.value);
+                        setOrderPage(0);
+                      }}
+                    />
+                  </div>
+                  <div>
+                    <Label htmlFor="customer-filter">Khách hàng</Label>
+                    <Input
+                      id="customer-filter"
+                      placeholder="Tên hoặc email"
+                      value={customerFilter}
+                      onChange={(e) => {
+                        setCustomerFilter(e.target.value);
+                        setOrderPage(0);
+                      }}
+                    />
+                  </div>
+                  <div>
                     <Label htmlFor="order-status-filter">Trạng thái</Label>
                     <Select
                       value={orderStatusFilter || 'all'}
-                      onValueChange={(value) => setOrderStatusFilter(value === 'all' ? undefined : value)}
+                      onValueChange={(value) => {
+                        setOrderStatusFilter(value === 'all' ? undefined : value);
+                        setOrderPage(0);
+                      }}
                     >
                       <SelectTrigger id="order-status-filter">
                         <SelectValue placeholder="Tất cả trạng thái" />
@@ -383,11 +421,30 @@ export default function OrderFulfillment() {
                       <SelectContent>
                         <SelectItem value="all">Tất cả trạng thái</SelectItem>
                         <SelectItem value="PENDING">Chờ xử lý</SelectItem>
+                        <SelectItem value="WAITING_PAYMENT">Chờ thanh toán</SelectItem>
                         <SelectItem value="CONFIRMED">Đã xác nhận</SelectItem>
                         <SelectItem value="PROCESSING">Đang xử lý</SelectItem>
                         <SelectItem value="SHIPPED">Đã gửi hàng</SelectItem>
                         <SelectItem value="DELIVERED">Đã giao hàng</SelectItem>
                         <SelectItem value="CANCELLED">Đã hủy</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </div>
+                  <div>
+                    <Label htmlFor="order-sort">Sắp xếp</Label>
+                    <Select
+                      value={orderSort}
+                      onValueChange={(value: "createdAt,desc" | "createdAt,asc") => {
+                        setOrderSort(value);
+                        setOrderPage(0);
+                      }}
+                    >
+                      <SelectTrigger id="order-sort">
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="createdAt,desc">Mới nhất</SelectItem>
+                        <SelectItem value="createdAt,asc">Cũ nhất</SelectItem>
                       </SelectContent>
                     </Select>
                   </div>
@@ -411,8 +468,6 @@ export default function OrderFulfillment() {
                           <TableHead>Mã đơn hàng</TableHead>
                           <TableHead>Khách hàng</TableHead>
                           <TableHead>Trạng thái</TableHead>
-                          <TableHead>Thanh toán</TableHead>
-                          <TableHead>Số lượng sản phẩm</TableHead>
                           <TableHead>Tổng tiền</TableHead>
                           <TableHead>Ngày đặt</TableHead>
                           <TableHead className="text-right">Thao tác</TableHead>
@@ -433,27 +488,33 @@ export default function OrderFulfillment() {
                                 {getStatusLabel(order.status)}
                               </Badge>
                             </TableCell>
-                            <TableCell>
-                              {order.paymentStatus ? (
-                                <Badge variant={order.paymentStatus === 'PAID' ? 'default' : 'secondary'}>
-                                  {order.paymentStatus === 'PAID' ? 'Đã thanh toán' : order.paymentStatus === 'PENDING' ? 'Chờ thanh toán' : 'Đã hoàn tiền'}
-                                </Badge>
-                              ) : '-'}
-                            </TableCell>
-                            <TableCell>{order.items?.length || 0}</TableCell>
                             <TableCell>{order.totalAmount?.toLocaleString('vi-VN') || 0} VNĐ</TableCell>
                             <TableCell>{formatDate(order.createdAt)}</TableCell>
                             <TableCell className="text-right">
-                              <Button
-                                variant="outline"
-                                size="sm"
-                                onClick={() => {
-                                  setSelectedOrderForDetails(order.id);
-                                  setOrderDetailsDialogOpen(true);
-                                }}
-                              >
-                                Xem chi tiết
-                              </Button>
+                              <div className="flex justify-end gap-2">
+                                <Button
+                                  variant="ghost"
+                                  size="sm"
+                                  onClick={() => {
+                                    setSelectedOrderForDetails(order.id);
+                                    setOrderDetailsDialogOpen(true);
+                                  }}
+                                  title="Xem chi tiết"
+                                  className="border-0"
+                                >
+                                  <Eye className="h-4 w-4" />
+                                </Button>
+                                <Button
+                                  variant="ghost"
+                                  size="sm"
+                                  onClick={() => handleCreateConsignments(order.id)}
+                                  disabled={createConsignmentsMutation.isPending || order.status !== 'CONFIRMED'}
+                                  title="Tạo lô hàng"
+                                  className="border-0"
+                                >
+                                  <Package className="h-4 w-4" />
+                                </Button>
+                              </div>
                             </TableCell>
                           </TableRow>
                         ))}
