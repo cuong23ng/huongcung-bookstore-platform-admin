@@ -1,4 +1,4 @@
-import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger } from "../ui/dialog";
+import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "../ui/dialog";
 import { Button } from "../ui/button";
 import { Input } from "../ui/input";
 import { Label } from "../ui/label";
@@ -50,15 +50,20 @@ export function BookFormDialog({
   onSubmit,
   isSubmitting,
 }: BookFormDialogProps) {
+  // Normalize arrays to ensure they're always arrays and filter out invalid items
+  const safeAuthors = Array.isArray(authors) ? authors.filter(a => a && a.id != null) : [];
+  const safeTranslators = Array.isArray(translators) ? translators.filter(t => t && t.id != null) : [];
+  const safePublishers = Array.isArray(publishers) ? publishers.filter(p => p && p.id != null) : [];
+  const safeGenres = Array.isArray(genres) ? genres.filter(g => g && g.id != null) : [];
+
   return (
-    <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogTrigger asChild>
-        <Button onClick={() => onOpenChange(true)}>
-          <Plus className="mr-2 h-4 w-4" />
-          Thêm sách mới
-        </Button>
-      </DialogTrigger>
-      <DialogContent className="max-w-3xl max-h-[90vh] overflow-y-auto">
+    <>
+      <Button onClick={() => onOpenChange(true)}>
+        <Plus className="mr-2 h-4 w-4" />
+        Thêm sách mới
+      </Button>
+      <Dialog open={open} onOpenChange={onOpenChange}>
+        <DialogContent className="max-w-3xl max-h-[90vh] overflow-y-auto">
         <DialogHeader>
           <DialogTitle>Thêm sách mới</DialogTitle>
           <DialogDescription>
@@ -150,12 +155,12 @@ export function BookFormDialog({
               {isLoadingAuthors && (
                 <div className="text-sm text-muted-foreground">Đang tải...</div>
               )}
-              {!isLoadingAuthors && authors.length === 0 && (
+              {!isLoadingAuthors && safeAuthors.length === 0 && (
                 <div className="text-sm text-muted-foreground">Chưa có tác giả nào</div>
               )}
-              {!isLoadingAuthors && authors.length > 0 && (
+              {!isLoadingAuthors && safeAuthors.length > 0 && (
                 <div className="space-y-2">
-                  {authors.map((author) => (
+                  {safeAuthors.map((author) => (
                     <div key={author.id} className="flex items-center space-x-2">
                       <Checkbox
                         id={`author-${author.id}`}
@@ -182,26 +187,26 @@ export function BookFormDialog({
               {isLoadingTranslators && (
                 <div className="text-sm text-muted-foreground">Đang tải...</div>
               )}
-              {!isLoadingTranslators && translators.length === 0 && (
+              {!isLoadingTranslators && safeTranslators.length === 0 && (
                 <div className="text-sm text-muted-foreground">Chưa có dịch giả nào</div>
               )}
-              {!isLoadingTranslators && translators.length > 0 && (
+              {!isLoadingTranslators && safeTranslators.length > 0 && (
                 <div className="space-y-2">
-                  {translators.map((translator) => (
-                    <div key={translator.id} className="flex items-center space-x-2">
-                      <Checkbox
-                        id={`translator-${translator.id}`}
-                        checked={formData.translatorIds?.includes(translator.id) || false}
-                        onCheckedChange={() => onToggleTranslator(translator.id)}
-                      />
-                      <Label
-                        htmlFor={`translator-${translator.id}`}
-                        className="text-sm font-normal cursor-pointer"
-                      >
-                        {translator.name}
-                      </Label>
-                    </div>
-                  ))}
+                  {safeTranslators.map((translator) => (
+                      <div key={translator.id} className="flex items-center space-x-2">
+                        <Checkbox
+                          id={`translator-${translator.id}`}
+                          checked={formData.translatorIds?.includes(translator.id) || false}
+                          onCheckedChange={() => onToggleTranslator(translator.id)}
+                        />
+                        <Label
+                          htmlFor={`translator-${translator.id}`}
+                          className="text-sm font-normal cursor-pointer"
+                        >
+                          {translator.name}
+                        </Label>
+                      </div>
+                    ))}
                 </div>
               )}
             </div>
@@ -225,11 +230,11 @@ export function BookFormDialog({
               </SelectTrigger>
               <SelectContent>
                 <SelectItem value="none">Không chọn</SelectItem>
-                {publishers.map((publisher) => (
-                  <SelectItem key={publisher.id} value={publisher.id.toString()}>
-                    {publisher.name}
-                  </SelectItem>
-                ))}
+                {safePublishers.map((publisher) => (
+                    <SelectItem key={publisher.id} value={publisher.id.toString()}>
+                      {publisher.name}
+                    </SelectItem>
+                  ))}
               </SelectContent>
             </Select>
           </div>
@@ -241,12 +246,12 @@ export function BookFormDialog({
               {isLoadingGenres && (
                 <div className="text-sm text-muted-foreground">Đang tải...</div>
               )}
-              {!isLoadingGenres && genres.length === 0 && (
+              {!isLoadingGenres && safeGenres.length === 0 && (
                 <div className="text-sm text-muted-foreground">Chưa có thể loại nào</div>
               )}
-              {!isLoadingGenres && genres.length > 0 && (
+              {!isLoadingGenres && safeGenres.length > 0 && (
                 <div className="space-y-2">
-                  {genres.map((genre) => (
+                  {safeGenres.map((genre) => (
                     <div key={genre.id} className="flex items-center space-x-2">
                       <Checkbox
                         id={`genre-${genre.id}`}
@@ -464,5 +469,6 @@ export function BookFormDialog({
         </form>
       </DialogContent>
     </Dialog>
+    </>
   );
 }

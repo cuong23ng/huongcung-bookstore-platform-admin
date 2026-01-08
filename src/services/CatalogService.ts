@@ -58,19 +58,10 @@ export class CatalogService {
 
   public async createBook(data: CreateBookRequest): Promise<Book> {
     try {
-      const response = await this.apiFetcher.post<BaseResponse<Book>>('/admin/catalog/books', data);
-      // Check for error code first
+      const response = await this.apiFetcher.post<BaseResponse<Book>>('/admin/catalog/books/create', data);
       if (response.data?.errorCode) {
         throw new Error(response.data.message || 'Failed to create book');
       }
-      // If no errorCode and data exists, return it
-      if (response.data?.data) {
-        console.log(response.data.data);
-        return response.data.data;
-      }
-      // If no data but no error, book was created successfully (backend may not return data)
-      // We need to refetch the book list or return a placeholder
-      throw new Error(response.data.message || 'Book created but data not returned');
     } catch (error) {
       throw this.handleError(error, 'Failed to create book');
     }

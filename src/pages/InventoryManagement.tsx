@@ -92,6 +92,18 @@ export default function InventoryManagement() {
     }),
   });
 
+  // Fetch stock level details by ID
+  const { data: stockLevelDetails, isLoading: isLoadingDetails, error: detailsError } = useQuery({
+    queryKey: ['stockLevelDetails', selectedStock?.id],
+    queryFn: async () => {
+      if (!selectedStock?.id) {
+        return null;
+      }
+      return InventoryService.getInstance().getStockLevelById(selectedStock.id);
+    },
+    enabled: !!selectedStock?.id && detailsDialogOpen,
+  });
+
   // Fetch adjustment history for selected stock
   const { data: adjustmentHistory, isLoading: isLoadingHistory } = useQuery({
     queryKey: ['stockAdjustments', selectedStock?.id, adjustmentHistoryPage, pageSize],
@@ -111,6 +123,7 @@ export default function InventoryManagement() {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['stockLevels'] });
       queryClient.invalidateQueries({ queryKey: ['stockAdjustments'] });
+      queryClient.invalidateQueries({ queryKey: ['stockLevelDetails'] });
       toast({
         title: "Điều chỉnh tồn kho thành công",
         description: "Số lượng tồn kho đã được cập nhật",
@@ -156,9 +169,11 @@ export default function InventoryManagement() {
 
   const handleAdjustStock = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!selectedStock) return;
+    // Use API data if available, fallback to selectedStock
+    const stockToUse = stockLevelDetails || selectedStock;
+    if (!stockToUse) return;
 
-    const currentQty = selectedStock.quantity ?? selectedStock.totalQuantity;
+    const currentQty = stockToUse.quantity ?? stockToUse.totalQuantity;
     const addQty = Number.parseInt(quantityToAdd, 10);
 
     if (Number.isNaN(addQty) || addQty < 0) {
@@ -174,10 +189,10 @@ export default function InventoryManagement() {
     const newTotalQuantity = currentQty + addQty;
 
     // Validate that new quantity is at least reserved quantity
-    if (newTotalQuantity < selectedStock.reservedQuantity) {
+    if (newTotalQuantity < stockToUse.reservedQuantity) {
       toast({
         title: "Lỗi xác thực",
-        description: `Tổng số lượng sau điều chỉnh (${newTotalQuantity}) phải lớn hơn hoặc bằng số lượng đã đặt trước (${selectedStock.reservedQuantity})`,
+        description: `Tổng số lượng sau điều chỉnh (${newTotalQuantity}) phải lớn hơn hoặc bằng số lượng đã đặt trước (${stockToUse.reservedQuantity})`,
         variant: "destructive",
       });
       return;
@@ -197,7 +212,7 @@ export default function InventoryManagement() {
       reason: adjustReason.trim(),
     };
 
-    adjustStockMutation.mutate({ stockLevelId: selectedStock.id, request });
+    adjustStockMutation.mutate({ stockLevelId: stockToUse.id, request });
   };
 
   const getCityLabel = (city: string) => {
@@ -433,6 +448,7 @@ export default function InventoryManagement() {
                       <TableHead>Thành phố</TableHead>
                       <TableHead>Trạng thái</TableHead>
                       <TableHead>Lần nhập hàng cuối</TableHead>
+                      <TableHead className="text-right">Thao tác</TableHead>
                     </TableRow>
                   </TableHeader>
                   <TableBody>
@@ -468,6 +484,17 @@ export default function InventoryManagement() {
                             </Badge>
                           </TableCell>
                           <TableCell>{formatDate(stock.lastRestocked)}</TableCell>
+                          <TableCell className="text-right">
+                            <Button
+                              variant="ghost"
+                              size="sm"
+                              onClick={() => handleViewDetails(stock)}
+                              title="Xem chi tiết"
+                              className="h-8 w-8 p-0"
+                            >
+                              <Eye className="h-4 w-4" />
+                            </Button>
+                          </TableCell>
                         </TableRow>
                       );
                     })}
@@ -513,218 +540,238 @@ export default function InventoryManagement() {
                         Thông tin đầy đủ về mặt hàng và kho
                       </DialogDescription>
                     </DialogHeader>
-                    {selectedStock && (
-                      <Tabs defaultValue="details" className="mt-4">
-                        <div className="flex items-center justify-between mb-4">
-                          <TabsList>
-                            <TabsTrigger value="details">Chi tiết</TabsTrigger>
-                            <TabsTrigger value="history">
-                              <History className="h-4 w-4 mr-1" />
-                              Lịch sử điều chỉnh
-                            </TabsTrigger>
-                          </TabsList>
-                          <Button
-                            variant="default"
-                            size="sm"
-                            onClick={handleOpenAdjustDialog}
-                          >
-                            <Edit className="h-4 w-4 mr-1" />
-                            Điều chỉnh tồn kho
-                          </Button>
-                        </div>
-                        <TabsContent value="details" className="space-y-6 mt-4">
-                        {/* Book Information */}
-                        <div className="space-y-3">
-                          <h3 className="text-lg font-semibold border-b pb-2">Thông tin sách</h3>
-                          <div className="grid grid-cols-2 gap-4">
-                            <div>
-                              <p className="text-sm font-medium text-muted-foreground">ID</p>
-                              <p className="text-sm">{selectedStock.bookId}</p>
-                            </div>
-                            <div>
-                              <p className="text-sm font-medium text-muted-foreground">Mã sách</p>
-                              <p className="text-sm">{selectedStock.bookCode || "-"}</p>
-                            </div>
-                            <div className="col-span-2">
-                              <p className="text-sm font-medium text-muted-foreground">Tên sách</p>
-                              <p className="text-sm">{selectedStock.bookTitle || "-"}</p>
-                            </div>
-                            <div>
-                              <p className="text-sm font-medium text-muted-foreground">ISBN</p>
-                              <p className="text-sm">{selectedStock.bookIsbn || "-"}</p>
-                            </div>
+                    {isLoadingDetails ? (
+                      <div className="text-center py-8">
+                        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary mx-auto"></div>
+                        <p className="mt-2 text-muted-foreground">Đang tải chi tiết tồn kho...</p>
+                      </div>
+                    ) : detailsError ? (
+                      <div className="text-center py-8">
+                        <p className="text-destructive mb-4">Lỗi tải chi tiết tồn kho</p>
+                        <p className="text-sm text-muted-foreground mb-4">
+                          {detailsError instanceof Error ? detailsError.message : "Có lỗi xảy ra"}
+                        </p>
+                        <Button variant="outline" onClick={() => queryClient.invalidateQueries({ queryKey: ['stockLevelDetails', selectedStock?.id] })}>
+                          Thử lại
+                        </Button>
+                      </div>
+                    ) : (stockLevelDetails || selectedStock) ? (() => {
+                      // Use API data if available, fallback to selectedStock
+                      const displayStock = stockLevelDetails || selectedStock;
+                      if (!displayStock) return null;
+                      
+                      return (
+                        <Tabs defaultValue="details" className="mt-4">
+                          <div className="flex items-center justify-between mb-4">
+                            <TabsList>
+                              <TabsTrigger value="details">Chi tiết</TabsTrigger>
+                              <TabsTrigger value="history">
+                                <History className="h-4 w-4 mr-1" />
+                                Lịch sử điều chỉnh
+                              </TabsTrigger>
+                            </TabsList>
+                            <Button
+                              variant="default"
+                              size="sm"
+                              onClick={handleOpenAdjustDialog}
+                            >
+                              <Edit className="h-4 w-4 mr-1" />
+                              Điều chỉnh tồn kho
+                            </Button>
                           </div>
-                        </div>
-
-                        {/* Warehouse Information */}
-                        <div className="space-y-3">
-                          <h3 className="text-lg font-semibold border-b pb-2">Thông tin kho</h3>
-                          <div className="grid grid-cols-2 gap-4">
-                            <div>
-                              <p className="text-sm font-medium text-muted-foreground">ID Kho</p>
-                              <p className="text-sm">{selectedStock.warehouseId || "-"}</p>
-                            </div>
-                            <div>
-                              <p className="text-sm font-medium text-muted-foreground">Mã kho</p>
-                              <p className="text-sm">{selectedStock.warehouseCode || "-"}</p>
-                            </div>
-                            <div>
-                              <p className="text-sm font-medium text-muted-foreground">Thành phố</p>
-                              <p className="text-sm">
-                                {selectedStock.warehouseCity 
-                                  ? getCityLabel(selectedStock.warehouseCity)
-                                  : selectedStock.city 
-                                  ? getCityLabel(selectedStock.city)
-                                  : "-"}
-                              </p>
-                            </div>
-                            <div className="col-span-2">
-                              <p className="text-sm font-medium text-muted-foreground">Địa chỉ</p>
-                              <p className="text-sm">{selectedStock.warehouseAddress || "-"}</p>
-                            </div>
-                          </div>
-                        </div>
-
-                        {/* Stock Information */}
-                        <div className="space-y-3">
-                          <div className="flex items-center justify-between border-b pb-2">
-                            <h3 className="text-lg font-semibold">Thông tin tồn kho</h3>
-                            <div className="flex gap-2">
-                              {isOutOfStock(selectedStock) && (
-                                <span className="px-2 py-1 text-xs font-semibold rounded bg-red-100 text-red-800 dark:bg-red-900 dark:text-red-200">
-                                  Hết hàng
-                                </span>
-                              )}
-                              {!isOutOfStock(selectedStock) && isLowStock(selectedStock) && (
-                                <span className="px-2 py-1 text-xs font-semibold rounded bg-orange-100 text-orange-800 dark:bg-orange-900 dark:text-orange-200">
-                                  Tồn kho thấp
-                                </span>
-                              )}
-                            </div>
-                          </div>
-                          <div className="grid grid-cols-2 gap-4">
-                            <div className="col-span-2">
-                              <div className="p-4 rounded-lg border bg-muted/50">
-                                <div className="grid grid-cols-3 gap-4">
+                          <TabsContent value="details" className="space-y-6 mt-4">
+                              {/* Book Information */}
+                              <div className="space-y-3">
+                                <h3 className="text-lg font-semibold border-b pb-2">Thông tin sách</h3>
+                                <div className="grid grid-cols-2 gap-4">
                                   <div>
-                                    <p className="text-sm font-medium text-muted-foreground mb-1">Tổng số lượng</p>
-                                    <p className="text-2xl font-bold">
-                                      {selectedStock.quantity ?? selectedStock.totalQuantity}
-                                    </p>
+                                    <p className="text-sm font-medium text-muted-foreground">ID</p>
+                                    <p className="text-sm">{displayStock.id}</p>
                                   </div>
                                   <div>
-                                    <p className="text-sm font-medium text-muted-foreground mb-1">
-                                      Đã đặt trước
-                                      {(() => {
-                                        const qty = selectedStock.quantity ?? selectedStock.totalQuantity;
-                                        const percent = qty > 0 ? Math.round((selectedStock.reservedQuantity / qty) * 100) : 0;
-                                        return percent > 0 ? ` (${percent}%)` : '';
-                                      })()}
-                                    </p>
-                                    <p className="text-2xl font-bold text-blue-600 dark:text-blue-400">
-                                      {selectedStock.reservedQuantity}
-                                    </p>
-                                    <p className="text-xs text-muted-foreground mt-1">
-                                      Đã cam kết cho đơn hàng
-                                    </p>
+                                    <p className="text-sm font-medium text-muted-foreground">Mã sách</p>
+                                    <p className="text-sm">{displayStock.sku || "-"}</p>
+                                  </div>
+                                  <div className="col-span-2">
+                                    <p className="text-sm font-medium text-muted-foreground">Tên sách</p>
+                                    <p className="text-sm">{displayStock.bookTitle || "-"}</p>
                                   </div>
                                   <div>
-                                    <p className="text-sm font-medium text-muted-foreground mb-1">Có sẵn</p>
-                                    <p className={`text-2xl font-bold ${
-                                      isOutOfStock(selectedStock)
-                                        ? "text-destructive" 
-                                        : selectedStock.availableQuantity < 0
-                                        ? "text-orange-600"
-                                        : selectedStock.availableQuantity === 0
-                                        ? "text-yellow-600"
-                                        : "text-green-600 dark:text-green-400"
-                                    }`}>
-                                      {selectedStock.availableQuantity}
-                                    </p>
-                                    {selectedStock.availableQuantity < 0 && (
-                                      <p className="text-xs text-orange-600 mt-1">
-                                        Thiếu {Math.abs(selectedStock.availableQuantity)} đơn vị
-                                      </p>
-                                    )}
-                                    <p className="text-xs text-muted-foreground mt-1">
-                                      Có thể bán
-                                    </p>
+                                    <p className="text-sm font-medium text-muted-foreground">ISBN</p>
+                                    <p className="text-sm">{displayStock.isbn || "-"}</p>
                                   </div>
                                 </div>
-                                {/* Progress bar showing reserved vs available */}
-                                {(() => {
-                                  const totalQty = selectedStock.quantity ?? selectedStock.totalQuantity;
-                                  const reservedPercent = totalQty > 0 ? (selectedStock.reservedQuantity / totalQty) * 100 : 0;
-                                  const availablePercent = totalQty > 0 ? (selectedStock.availableQuantity / totalQty) * 100 : 0;
-                                  return totalQty > 0 ? (
-                                    <div className="mt-4">
-                                      <div className="flex h-4 rounded-full overflow-hidden border">
-                                        <div 
-                                          className="bg-blue-500 transition-all"
-                                          style={{ width: `${Math.min(reservedPercent, 100)}%` }}
-                                          title={`Đã đặt trước: ${selectedStock.reservedQuantity}`}
-                                        />
-                                        <div 
-                                          className={`transition-all ${
-                                            availablePercent > 0 
-                                              ? "bg-green-500" 
-                                              : availablePercent < 0
-                                              ? "bg-orange-500"
-                                              : "bg-yellow-500"
-                                          }`}
-                                          style={{ width: `${Math.max(0, Math.min(availablePercent, 100))}%` }}
-                                          title={`Có sẵn: ${selectedStock.availableQuantity}`}
-                                        />
-                                      </div>
-                                      <div className="flex justify-between text-xs text-muted-foreground mt-1">
-                                        <span>Đã đặt: {selectedStock.reservedQuantity}</span>
-                                        <span>Có sẵn: {selectedStock.availableQuantity}</span>
-                                      </div>
-                                    </div>
-                                  ) : null;
-                                })()}
                               </div>
-                            </div>
-                            <div>
-                              <p className="text-sm font-medium text-muted-foreground">Mức đặt lại</p>
-                              <div className="flex items-center gap-2">
-                                <p className="text-sm font-semibold">
-                                  {selectedStock.reorderLevel ?? "-"}
-                                </p>
-                                {selectedStock.reorderLevel !== undefined && 
-                                 selectedStock.reorderLevel !== null &&
-                                 isLowStock(selectedStock) && (
-                                  <AlertTriangle className="h-4 w-4 text-orange-500" />
-                                )}
-                              </div>
-                            </div>
-                            <div>
-                              <p className="text-sm font-medium text-muted-foreground">Số lượng đặt lại</p>
-                              <p className="text-sm">{selectedStock.reorderQuantity ?? "-"}</p>
-                            </div>
-                          </div>
-                        </div>
 
-                        {/* Timestamps */}
-                        <div className="space-y-3">
-                          <h3 className="text-lg font-semibold border-b pb-2">Thông tin thời gian</h3>
-                          <div className="grid grid-cols-2 gap-4">
-                            <div>
-                              <p className="text-sm font-medium text-muted-foreground">Lần nhập hàng cuối</p>
-                              <p className="text-sm">{formatDate(selectedStock.lastRestocked)}</p>
-                            </div>
-                            <div>
-                              <p className="text-sm font-medium text-muted-foreground">Cập nhật lần cuối</p>
-                              <p className="text-sm">{formatDate(selectedStock.updatedAt || selectedStock.lastUpdated)}</p>
-                            </div>
-                            <div>
-                              <p className="text-sm font-medium text-muted-foreground">Ngày tạo</p>
-                              <p className="text-sm">{formatDate(selectedStock.createdAt)}</p>
-                            </div>
-                          </div>
-                        </div>
-                        </TabsContent>
-                        <TabsContent value="history" className="mt-4">
+                              {/* Warehouse Information */}
+                              <div className="space-y-3">
+                                <h3 className="text-lg font-semibold border-b pb-2">Thông tin kho</h3>
+                                <div className="grid grid-cols-2 gap-4">
+                                  <div>
+                                    <p className="text-sm font-medium text-muted-foreground">ID Kho</p>
+                                    <p className="text-sm">{displayStock.warehouseId || "-"}</p>
+                                  </div>
+                                  <div>
+                                    <p className="text-sm font-medium text-muted-foreground">Mã kho</p>
+                                    <p className="text-sm">{displayStock.warehouseCode || "-"}</p>
+                                  </div>
+                                  <div>
+                                    <p className="text-sm font-medium text-muted-foreground">Thành phố</p>
+                                    <p className="text-sm">
+                                      {displayStock.warehouseCity 
+                                        ? getCityLabel(displayStock.warehouseCity)
+                                        : displayStock.city 
+                                        ? getCityLabel(displayStock.city)
+                                        : "-"}
+                                    </p>
+                                  </div>
+                                  <div className="col-span-2">
+                                    <p className="text-sm font-medium text-muted-foreground">Địa chỉ</p>
+                                    <p className="text-sm">{displayStock.warehouseAddress || "-"}</p>
+                                  </div>
+                                </div>
+                              </div>
+
+                              {/* Stock Information */}
+                              <div className="space-y-3">
+                                <div className="flex items-center justify-between border-b pb-2">
+                                  <h3 className="text-lg font-semibold">Thông tin tồn kho</h3>
+                                  <div className="flex gap-2">
+                                    {isOutOfStock(displayStock) && (
+                                      <span className="px-2 py-1 text-xs font-semibold rounded bg-red-100 text-red-800 dark:bg-red-900 dark:text-red-200">
+                                        Hết hàng
+                                      </span>
+                                    )}
+                                    {!isOutOfStock(displayStock) && isLowStock(displayStock) && (
+                                      <span className="px-2 py-1 text-xs font-semibold rounded bg-orange-100 text-orange-800 dark:bg-orange-900 dark:text-orange-200">
+                                        Tồn kho thấp
+                                      </span>
+                                    )}
+                                  </div>
+                                </div>
+                                <div className="grid grid-cols-2 gap-4">
+                                  <div className="col-span-2">
+                                    <div className="p-4 rounded-lg border bg-muted/50">
+                                      <div className="grid grid-cols-3 gap-4">
+                                        <div>
+                                          <p className="text-sm font-medium text-muted-foreground mb-1">Tổng số lượng</p>
+                                          <p className="text-2xl font-bold">
+                                            {displayStock.quantity ?? displayStock.totalQuantity}
+                                          </p>
+                                        </div>
+                                        <div>
+                                          <p className="text-sm font-medium text-muted-foreground mb-1">
+                                            Đã đặt trước
+                                            {(() => {
+                                              const qty = displayStock.quantity ?? displayStock.totalQuantity;
+                                              const percent = qty > 0 ? Math.round((displayStock.reservedQuantity / qty) * 100) : 0;
+                                              return percent > 0 ? ` (${percent}%)` : '';
+                                            })()}
+                                          </p>
+                                          <p className="text-2xl font-bold text-blue-600 dark:text-blue-400">
+                                            {displayStock.reservedQuantity}
+                                          </p>
+                                          <p className="text-xs text-muted-foreground mt-1">
+                                            Đã cam kết cho đơn hàng
+                                          </p>
+                                        </div>
+                                        <div>
+                                          <p className="text-sm font-medium text-muted-foreground mb-1">Có sẵn</p>
+                                          <p className={`text-2xl font-bold ${
+                                            isOutOfStock(displayStock)
+                                              ? "text-destructive" 
+                                              : displayStock.availableQuantity < 0
+                                              ? "text-orange-600"
+                                              : displayStock.availableQuantity === 0
+                                              ? "text-yellow-600"
+                                              : "text-green-600 dark:text-green-400"
+                                          }`}>
+                                            {displayStock.availableQuantity}
+                                          </p>
+                                          {displayStock.availableQuantity < 0 && (
+                                            <p className="text-xs text-orange-600 mt-1">
+                                              Thiếu {Math.abs(displayStock.availableQuantity)} đơn vị
+                                            </p>
+                                          )}
+                                          <p className="text-xs text-muted-foreground mt-1">
+                                            Có thể bán
+                                          </p>
+                                        </div>
+                                      </div>
+                                      {/* Progress bar showing reserved vs available */}
+                                      {(() => {
+                                        const totalQty = displayStock.quantity ?? displayStock.totalQuantity;
+                                        const reservedPercent = totalQty > 0 ? (displayStock.reservedQuantity / totalQty) * 100 : 0;
+                                        const availablePercent = totalQty > 0 ? (displayStock.availableQuantity / totalQty) * 100 : 0;
+                                        return totalQty > 0 ? (
+                                          <div className="mt-4">
+                                            <div className="flex h-4 rounded-full overflow-hidden border">
+                                              <div 
+                                                className="bg-blue-500 transition-all"
+                                                style={{ width: `${Math.min(reservedPercent, 100)}%` }}
+                                                title={`Đã đặt trước: ${displayStock.reservedQuantity}`}
+                                              />
+                                              <div 
+                                                className={`transition-all ${
+                                                  availablePercent > 0 
+                                                    ? "bg-green-500" 
+                                                    : availablePercent < 0
+                                                    ? "bg-orange-500"
+                                                    : "bg-yellow-500"
+                                                }`}
+                                                style={{ width: `${Math.max(0, Math.min(availablePercent, 100))}%` }}
+                                                title={`Có sẵn: ${displayStock.availableQuantity}`}
+                                              />
+                                            </div>
+                                            <div className="flex justify-between text-xs text-muted-foreground mt-1">
+                                              <span>Đã đặt: {displayStock.reservedQuantity}</span>
+                                              <span>Có sẵn: {displayStock.availableQuantity}</span>
+                                            </div>
+                                          </div>
+                                        ) : null;
+                                      })()}
+                                    </div>
+                                  </div>
+                                  <div>
+                                    <p className="text-sm font-medium text-muted-foreground">Mức đặt lại</p>
+                                    <div className="flex items-center gap-2">
+                                      <p className="text-sm font-semibold">
+                                        {displayStock.reorderLevel ?? "-"}
+                                      </p>
+                                      {displayStock.reorderLevel !== undefined && 
+                                       displayStock.reorderLevel !== null &&
+                                       isLowStock(displayStock) && (
+                                        <AlertTriangle className="h-4 w-4 text-orange-500" />
+                                      )}
+                                    </div>
+                                  </div>
+                                  <div>
+                                    <p className="text-sm font-medium text-muted-foreground">Số lượng đặt lại</p>
+                                    <p className="text-sm">{displayStock.reorderQuantity ?? "-"}</p>
+                                  </div>
+                                </div>
+                              </div>
+
+                              {/* Timestamps */}
+                              <div className="space-y-3">
+                                <h3 className="text-lg font-semibold border-b pb-2">Thông tin thời gian</h3>
+                                <div className="grid grid-cols-2 gap-4">
+                                  <div>
+                                    <p className="text-sm font-medium text-muted-foreground">Lần nhập hàng cuối</p>
+                                    <p className="text-sm">{formatDate(displayStock.lastRestocked)}</p>
+                                  </div>
+                                  <div>
+                                    <p className="text-sm font-medium text-muted-foreground">Cập nhật lần cuối</p>
+                                    <p className="text-sm">{formatDate(displayStock.updatedAt || displayStock.lastUpdated)}</p>
+                                  </div>
+                                  <div>
+                                    <p className="text-sm font-medium text-muted-foreground">Ngày tạo</p>
+                                    <p className="text-sm">{formatDate(displayStock.createdAt)}</p>
+                                  </div>
+                                </div>
+                              </div>
+                          </TabsContent>
+                          <TabsContent value="history" className="mt-4">
                           <div className="space-y-4">
                             <h3 className="text-lg font-semibold border-b pb-2">Lịch sử điều chỉnh tồn kho</h3>
                             {isLoadingHistory ? (
@@ -748,7 +795,7 @@ export default function InventoryManagement() {
                                   <TableBody>
                                     {adjustmentHistory.adjustments.map((adjustment: StockAdjustment) => (
                                       <TableRow key={adjustment.id}>
-                                        <TableCell>{formatDate(adjustment.adjustedAt)}</TableCell>
+                                        <TableCell>{formatDate(adjustment.createdAt)}</TableCell>
                                         <TableCell>{adjustment.previousQuantity}</TableCell>
                                         <TableCell className="font-semibold">{adjustment.newQuantity}</TableCell>
                                         <TableCell className={
@@ -802,9 +849,10 @@ export default function InventoryManagement() {
                               </div>
                             )}
                           </div>
-                        </TabsContent>
-                      </Tabs>
-                    )}
+                          </TabsContent>
+                        </Tabs>
+                      );
+                    })() : null}
                   </DialogContent>
                 </Dialog>
 
@@ -817,8 +865,12 @@ export default function InventoryManagement() {
                         Nhập số lượng thêm mới và lý do điều chỉnh
                       </DialogDescription>
                     </DialogHeader>
-                    {selectedStock && (() => {
-                      const currentQty = selectedStock.quantity ?? selectedStock.totalQuantity;
+                    {(() => {
+                      // Use API data if available, fallback to selectedStock
+                      const stockToUse = stockLevelDetails || selectedStock;
+                      if (!stockToUse) return null;
+                      
+                      const currentQty = stockToUse.quantity ?? stockToUse.totalQuantity;
                       const addQty = Number.parseInt(quantityToAdd, 10) || 0;
                       const newTotalQty = currentQty + addQty;
                       
@@ -857,9 +909,9 @@ export default function InventoryManagement() {
                                   {currentQty} + {addQty} = <span className="text-primary">{newTotalQty}</span>
                                 </span>
                               </div>
-                              {newTotalQty < selectedStock.reservedQuantity && (
+                              {newTotalQty < stockToUse.reservedQuantity && (
                                 <p className="text-xs text-destructive mt-1">
-                                  ⚠️ Tổng số lượng ({newTotalQty}) phải lớn hơn hoặc bằng số lượng đã đặt trước ({selectedStock.reservedQuantity})
+                                  ⚠️ Tổng số lượng ({newTotalQty}) phải lớn hơn hoặc bằng số lượng đã đặt trước ({stockToUse.reservedQuantity})
                                 </p>
                               )}
                             </div>

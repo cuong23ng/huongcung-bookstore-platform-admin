@@ -135,26 +135,8 @@ export class InventoryService {
     role: 'admin' | 'store_manager' = 'store_manager'
   ): Promise<StockLevel> {
     try {
-      // Determine endpoint based on role
-      const endpoint = role === 'admin'
-        ? `/admin/inventory/stock/${stockLevelId}/adjust`
-        : `/store-manager/inventory/stock/${stockLevelId}/adjust`;
-
-      // Backend returns BaseResponse with data as StockLevelDTO
+      const endpoint = `/admin/inventory/stock/${stockLevelId}/adjust`;
       const response = await this.apiFetcher.put<any>(endpoint, request);
-      
-      // Check if there's an error code (BaseResponse structure)
-      if (response.data.errorCode) {
-        throw new Error(response.data.message || 'Failed to adjust stock');
-      }
-
-      // Extract data from BaseResponse
-      const data = response.data.data;
-      if (!data) {
-        throw new Error(response.data.message || 'No data returned from server');
-      }
-
-      return data;
     } catch (error) {
       if (error instanceof AxiosError) {
         const errorMessage = 
@@ -162,6 +144,42 @@ export class InventoryService {
           (error.response?.data as any)?.message ||
           error.message ||
           'Failed to adjust stock. Please check your input and try again.';
+        throw new Error(errorMessage);
+      }
+      throw error;
+    }
+  }
+
+  /**
+   * Get stock level details by ID
+   * @param id the stock level ID
+   * @returns stock level details
+   */
+  public async getStockLevelById(id: number): Promise<StockLevel> {
+    try {
+      const endpoint = `/admin/inventory/stock/${id}`;
+
+      const response = await this.apiFetcher.get<any>(endpoint);
+      
+      // Check if there's an error code (BaseResponse structure)
+      if (response.data.errorCode) {
+        throw new Error(response.data.message || 'Failed to fetch stock level details');
+      }
+
+      // Extract data from BaseResponse -> StockLevelDTO structure
+      const stockLevelData = response.data.data;
+      if (!stockLevelData) {
+        throw new Error(response.data.message || 'No data returned from server');
+      }
+
+      return stockLevelData;
+    } catch (error) {
+      if (error instanceof AxiosError) {
+        const errorMessage = 
+          (error.response?.data as any)?.error?.message ||
+          (error.response?.data as any)?.message ||
+          error.message ||
+          'Failed to fetch stock level details. Please try again.';
         throw new Error(errorMessage);
       }
       throw error;
@@ -182,7 +200,7 @@ export class InventoryService {
   ): Promise<PaginatedStockAdjustments> {
     try {
       const response = await this.apiFetcher.get<any>(
-        `/store-manager/inventory/stock/${stockLevelId}/adjustments`,
+        `/admin/inventory/stock/${stockLevelId}/adjustments`,
         { params: { page, size } }
       );
       
