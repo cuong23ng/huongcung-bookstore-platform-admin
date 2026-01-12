@@ -62,6 +62,11 @@ export class CatalogService {
       if (response.data?.errorCode) {
         throw new Error(response.data.message || 'Failed to create book');
       }
+      // If no errorCode and data exists, return it
+      if (response.data?.data) {
+        return response.data.data;
+      }
+      throw new Error(response.data.message || 'Failed to create book');
     } catch (error) {
       throw this.handleError(error, 'Failed to create book');
     }
@@ -153,6 +158,49 @@ export class CatalogService {
       }
     } catch (error) {
       throw this.handleError(error, 'Failed to delete image');
+    }
+  }
+
+  public async createOrUpdatePhysicalBook(id: number, data: {
+    isbn?: string;
+    coverType?: string;
+    publicationDate?: string;
+    weightGrams?: number;
+    heightCm?: number;
+    widthCm?: number;
+    lengthCm?: number;
+    currentPrice?: number;
+  }): Promise<void> {
+    try {
+      const response = await this.apiFetcher.post<BaseResponse<null>>(
+        `/admin/catalog/books/${id}/create-update/physical`,
+        data
+      );
+
+      if (response.data?.errorCode) {
+        throw new Error(response.data.message || 'Failed to create/update physical book');
+      }
+    } catch (error) {
+      throw this.handleError(error, 'Failed to create/update physical book');
+    }
+  }
+
+  public async createOrUpdateEbook(id: number, data: {
+    isbn: string;
+    publicationDate?: string;
+    currentPrice: number;
+  }): Promise<void> {
+    try {
+      const response = await this.apiFetcher.post<BaseResponse<null>>(
+        `/admin/catalog/books/${id}/create-update/ebook`,
+        data
+      );
+
+      if (response.data?.errorCode) {
+        throw new Error(response.data.message || 'Failed to create/update ebook');
+      }
+    } catch (error) {
+      throw this.handleError(error, 'Failed to create/update ebook');
     }
   }
 

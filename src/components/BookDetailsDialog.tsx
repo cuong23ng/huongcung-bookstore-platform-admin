@@ -12,7 +12,7 @@ import {
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from "./ui/dropdown-menu";
-import { Loader2, Sparkles, CheckCircle, XCircle, Edit, Wand2, RefreshCw, ArrowUp, ArrowDown, Upload, X, Save } from "lucide-react";
+import { Loader2, Sparkles, CheckCircle, XCircle, Edit, Wand2, RefreshCw, ArrowUp, ArrowDown, Upload, X, Save, BookOpen, BookMarked } from "lucide-react";
 import { CatalogService } from "../services/CatalogService";
 import { ReviewService } from "../services/ReviewService";
 import { useToast } from "../hooks/use-toast";
@@ -41,6 +41,27 @@ export function BookDetailsDialog({
   const [reviewRating, setReviewRating] = useState<number | undefined>(undefined);
   const [selectedFiles, setSelectedFiles] = useState<File[]>([]);
   const [previewUrls, setPreviewUrls] = useState<string[]>([]);
+  const [isEditingPhysicalBook, setIsEditingPhysicalBook] = useState(false);
+  const [isEditingEbook, setIsEditingEbook] = useState(false);
+  
+  // Physical book form state
+  const [physicalBookForm, setPhysicalBookForm] = useState({
+    isbn: "",
+    coverType: "",
+    publicationDate: "",
+    weightGrams: "",
+    heightCm: "",
+    widthCm: "",
+    lengthCm: "",
+    currentPrice: "",
+  });
+
+  // Ebook form state
+  const [ebookForm, setEbookForm] = useState({
+    isbn: "",
+    publicationDate: "",
+    currentPrice: "",
+  });
 
   // Fetch book details
   const { data: bookDetails, isLoading: isLoadingBookDetails, refetch: refetchBookDetails } = useQuery({
@@ -73,6 +94,54 @@ export function BookDetailsDialog({
       // Reset editing state when review changes externally
     }
   }, [review, isEditingReview]);
+
+  // Sync physical book data to form state
+  useEffect(() => {
+    if (bookDetails?.physicalBookInfo) {
+      setPhysicalBookForm({
+        isbn: bookDetails.physicalBookInfo.isbn || "",
+        coverType: bookDetails.physicalBookInfo.coverType || "",
+        publicationDate: bookDetails.physicalBookInfo.publicationDate 
+          ? new Date(bookDetails.physicalBookInfo.publicationDate).toISOString().split('T')[0]
+          : "",
+        weightGrams: bookDetails.physicalBookInfo.weightGrams?.toString() || "",
+        heightCm: bookDetails.physicalBookInfo.heightCm?.toString() || "",
+        widthCm: bookDetails.physicalBookInfo.widthCm?.toString() || "",
+        lengthCm: bookDetails.physicalBookInfo.lengthCm?.toString() || "",
+        currentPrice: bookDetails.physicalBookInfo.currentPrice?.toString() || "",
+      });
+    } else {
+      setPhysicalBookForm({
+        isbn: "",
+        coverType: "",
+        publicationDate: "",
+        weightGrams: "",
+        heightCm: "",
+        widthCm: "",
+        lengthCm: "",
+        currentPrice: "",
+      });
+    }
+  }, [bookDetails?.physicalBookInfo]);
+
+  // Sync ebook data to form state
+  useEffect(() => {
+    if (bookDetails?.ebookInfo) {
+      setEbookForm({
+        isbn: bookDetails.ebookInfo.isbn || "",
+        publicationDate: bookDetails.ebookInfo.publicationDate 
+          ? new Date(bookDetails.ebookInfo.publicationDate).toISOString().split('T')[0]
+          : "",
+        currentPrice: bookDetails.ebookInfo.currentPrice?.toString() || "",
+      });
+    } else {
+      setEbookForm({
+        isbn: "",
+        publicationDate: "",
+        currentPrice: "",
+      });
+    }
+  }, [bookDetails?.ebookInfo]);
 
   // Create review mutation
   const createReviewMutation = useMutation({
@@ -235,6 +304,63 @@ export function BookDetailsDialog({
     onError: (error: Error) => {
       toast({ 
         title: "Lỗi xóa ảnh", 
+        description: error.message, 
+        variant: "destructive" 
+      });
+    },
+  });
+
+  // Create/Update physical book mutation
+  const createUpdatePhysicalBookMutation = useMutation({
+    mutationFn: () => bookId 
+      ? CatalogService.getInstance().createOrUpdatePhysicalBook(bookId, {
+          isbn: physicalBookForm.isbn || undefined,
+          coverType: physicalBookForm.coverType || undefined,
+          publicationDate: physicalBookForm.publicationDate || undefined,
+          weightGrams: physicalBookForm.weightGrams ? Number(physicalBookForm.weightGrams) : undefined,
+          heightCm: physicalBookForm.heightCm ? Number(physicalBookForm.heightCm) : undefined,
+          widthCm: physicalBookForm.widthCm ? Number(physicalBookForm.widthCm) : undefined,
+          lengthCm: physicalBookForm.lengthCm ? Number(physicalBookForm.lengthCm) : undefined,
+          currentPrice: physicalBookForm.currentPrice ? Number(physicalBookForm.currentPrice) : undefined,
+        })
+      : Promise.reject(new Error("Book ID is required")),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['bookDetails', bookId] });
+      setIsEditingPhysicalBook(false);
+      toast({ 
+        title: "Cập nhật thông tin sách giấy thành công", 
+        description: "Thông tin sách giấy đã được cập nhật",
+      });
+    },
+    onError: (error: Error) => {
+      toast({ 
+        title: "Lỗi cập nhật thông tin sách giấy", 
+        description: error.message, 
+        variant: "destructive" 
+      });
+    },
+  });
+
+  // Create/Update ebook mutation
+  const createUpdateEbookMutation = useMutation({
+    mutationFn: () => bookId 
+      ? CatalogService.getInstance().createOrUpdateEbook(bookId, {
+          isbn: ebookForm.isbn,
+          publicationDate: ebookForm.publicationDate || undefined,
+          currentPrice: Number(ebookForm.currentPrice),
+        })
+      : Promise.reject(new Error("Book ID is required")),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['bookDetails', bookId] });
+      setIsEditingEbook(false);
+      toast({ 
+        title: "Cập nhật thông tin sách điện tử thành công", 
+        description: "Thông tin sách điện tử đã được cập nhật",
+      });
+    },
+    onError: (error: Error) => {
+      toast({ 
+        title: "Lỗi cập nhật thông tin sách điện tử", 
         description: error.message, 
         variant: "destructive" 
       });
@@ -516,9 +642,20 @@ export function BookDetailsDialog({
             </div>
 
             {/* Physical Book Information */}
-            {bookDetails.physicalBookInfo && (
-              <div className="space-y-4">
-                <h3 className="text-lg font-semibold border-b pb-2">Thông tin sách giấy</h3>
+            <div className="space-y-4">
+              <div className="flex items-center justify-between border-b pb-2">
+                <h3 className="text-lg font-semibold">Thông tin sách giấy</h3>
+                <Button
+                  variant="ghost"
+                  size="icon"
+                  onClick={() => setIsEditingPhysicalBook(true)}
+                  className="border-0 h-6 w-6"
+                  title="Chỉnh sửa thông tin sách giấy"
+                >
+                  <Edit className="h-4 w-4" />
+                </Button>
+              </div>
+              {bookDetails.physicalBookInfo && (
                 <div className="grid grid-cols-2 gap-4">
                   {bookDetails.physicalBookInfo.isbn && (
                     <div>
@@ -575,13 +712,27 @@ export function BookDetailsDialog({
                     </div>
                   )}
                 </div>
-              </div>
-            )}
+              )}
+              {!bookDetails.physicalBookInfo && (
+                <p className="text-sm text-muted-foreground">Chưa có thông tin sách giấy</p>
+              )}
+            </div>
 
             {/* Ebook Information */}
-            {bookDetails.ebookInfo && (
-              <div className="space-y-4">
-                <h3 className="text-lg font-semibold border-b pb-2">Thông tin sách điện tử</h3>
+            <div className="space-y-4">
+              <div className="flex items-center justify-between border-b pb-2">
+                <h3 className="text-lg font-semibold">Thông tin sách điện tử</h3>
+                <Button
+                  variant="ghost"
+                  size="icon"
+                  onClick={() => setIsEditingEbook(true)}
+                  className="border-0 h-6 w-6"
+                  title="Chỉnh sửa thông tin sách điện tử"
+                >
+                  <Edit className="h-4 w-4" />
+                </Button>
+              </div>
+              {bookDetails.ebookInfo && (
                 <div className="grid grid-cols-2 gap-4">
                   {bookDetails.ebookInfo.isbn && (
                     <div>
@@ -602,8 +753,11 @@ export function BookDetailsDialog({
                     </div>
                   )}
                 </div>
-              </div>
-            )}
+              )}
+              {!bookDetails.ebookInfo && (
+                <p className="text-sm text-muted-foreground">Chưa có thông tin sách điện tử</p>
+              )}
+            </div>
 
             {/* Review Section */}
             {/* <div className="space-y-4">
@@ -895,6 +1049,224 @@ export function BookDetailsDialog({
         imageSrc={selectedImage?.src || null}
         imageLabel={selectedImage?.label}
       />
+
+      {/* Physical Book Edit Dialog */}
+      <Dialog open={isEditingPhysicalBook} onOpenChange={setIsEditingPhysicalBook}>
+        <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
+          <DialogHeader>
+            <DialogTitle>Chỉnh sửa thông tin sách giấy</DialogTitle>
+            <DialogDescription>
+              {bookDetails?.physicalBookInfo ? "Cập nhật" : "Thêm"} thông tin sách giấy
+            </DialogDescription>
+          </DialogHeader>
+          <form
+            onSubmit={(e) => {
+              e.preventDefault();
+              createUpdatePhysicalBookMutation.mutate();
+            }}
+            className="space-y-4 mt-4"
+          >
+            <div className="grid grid-cols-2 gap-4">
+              <div className="space-y-2">
+                <Label htmlFor="physical-isbn">ISBN</Label>
+                <Input
+                  id="physical-isbn"
+                  value={physicalBookForm.isbn}
+                  onChange={(e) => setPhysicalBookForm({ ...physicalBookForm, isbn: e.target.value })}
+                  placeholder="Nhập ISBN"
+                />
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="physical-coverType">Loại bìa</Label>
+                <select
+                  id="physical-coverType"
+                  className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
+                  value={physicalBookForm.coverType}
+                  onChange={(e) => setPhysicalBookForm({ ...physicalBookForm, coverType: e.target.value })}
+                >
+                  <option value="">Chọn loại bìa</option>
+                  <option value="HARDCOVER">Bìa cứng</option>
+                  <option value="PAPERBACK">Bìa mềm</option>
+                </select>
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="physical-publicationDate">Ngày xuất bản</Label>
+                <Input
+                  id="physical-publicationDate"
+                  type="date"
+                  value={physicalBookForm.publicationDate}
+                  onChange={(e) => setPhysicalBookForm({ ...physicalBookForm, publicationDate: e.target.value })}
+                />
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="physical-currentPrice">Giá (VNĐ)</Label>
+                <Input
+                  id="physical-currentPrice"
+                  type="number"
+                  step="0.01"
+                  min="0"
+                  value={physicalBookForm.currentPrice}
+                  onChange={(e) => setPhysicalBookForm({ ...physicalBookForm, currentPrice: e.target.value })}
+                  placeholder="Nhập giá"
+                />
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="physical-weightGrams">Trọng lượng (gram)</Label>
+                <Input
+                  id="physical-weightGrams"
+                  type="number"
+                  min="0"
+                  value={physicalBookForm.weightGrams}
+                  onChange={(e) => setPhysicalBookForm({ ...physicalBookForm, weightGrams: e.target.value })}
+                  placeholder="Nhập trọng lượng"
+                />
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="physical-heightCm">Chiều cao (cm)</Label>
+                <Input
+                  id="physical-heightCm"
+                  type="number"
+                  step="0.1"
+                  min="0"
+                  value={physicalBookForm.heightCm}
+                  onChange={(e) => setPhysicalBookForm({ ...physicalBookForm, heightCm: e.target.value })}
+                  placeholder="Nhập chiều cao"
+                />
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="physical-widthCm">Chiều rộng (cm)</Label>
+                <Input
+                  id="physical-widthCm"
+                  type="number"
+                  step="0.1"
+                  min="0"
+                  value={physicalBookForm.widthCm}
+                  onChange={(e) => setPhysicalBookForm({ ...physicalBookForm, widthCm: e.target.value })}
+                  placeholder="Nhập chiều rộng"
+                />
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="physical-lengthCm">Chiều dài (cm)</Label>
+                <Input
+                  id="physical-lengthCm"
+                  type="number"
+                  step="0.1"
+                  min="0"
+                  value={physicalBookForm.lengthCm}
+                  onChange={(e) => setPhysicalBookForm({ ...physicalBookForm, lengthCm: e.target.value })}
+                  placeholder="Nhập chiều dài"
+                />
+              </div>
+            </div>
+            <div className="flex justify-end gap-2 pt-4">
+              <Button
+                type="button"
+                variant="outline"
+                onClick={() => setIsEditingPhysicalBook(false)}
+              >
+                Hủy
+              </Button>
+              <Button
+                type="submit"
+                disabled={createUpdatePhysicalBookMutation.isPending}
+              >
+                {createUpdatePhysicalBookMutation.isPending ? (
+                  <>
+                    <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                    Đang lưu...
+                  </>
+                ) : (
+                  "Lưu"
+                )}
+              </Button>
+            </div>
+          </form>
+        </DialogContent>
+      </Dialog>
+
+      {/* Ebook Edit Dialog */}
+      <Dialog open={isEditingEbook} onOpenChange={setIsEditingEbook}>
+        <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
+          <DialogHeader>
+            <DialogTitle>Chỉnh sửa thông tin sách điện tử</DialogTitle>
+            <DialogDescription>
+              {bookDetails?.ebookInfo ? "Cập nhật" : "Thêm"} thông tin sách điện tử
+            </DialogDescription>
+          </DialogHeader>
+          <form
+            onSubmit={(e) => {
+              e.preventDefault();
+              if (!ebookForm.isbn || !ebookForm.currentPrice) {
+                toast({
+                  title: "Lỗi",
+                  description: "ISBN và giá là bắt buộc",
+                  variant: "destructive",
+                });
+                return;
+              }
+              createUpdateEbookMutation.mutate();
+            }}
+            className="space-y-4 mt-4"
+          >
+            <div className="grid grid-cols-2 gap-4">
+              <div className="space-y-2">
+                <Label htmlFor="ebook-isbn">E-ISBN <span className="text-red-500">*</span></Label>
+                <Input
+                  id="ebook-isbn"
+                  value={ebookForm.isbn}
+                  onChange={(e) => setEbookForm({ ...ebookForm, isbn: e.target.value })}
+                  placeholder="Nhập E-ISBN"
+                  required
+                />
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="ebook-publicationDate">Ngày xuất bản</Label>
+                <Input
+                  id="ebook-publicationDate"
+                  type="date"
+                  value={ebookForm.publicationDate}
+                  onChange={(e) => setEbookForm({ ...ebookForm, publicationDate: e.target.value })}
+                />
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="ebook-currentPrice">Giá (VNĐ) <span className="text-red-500">*</span></Label>
+                <Input
+                  id="ebook-currentPrice"
+                  type="number"
+                  step="0.01"
+                  min="0"
+                  value={ebookForm.currentPrice}
+                  onChange={(e) => setEbookForm({ ...ebookForm, currentPrice: e.target.value })}
+                  placeholder="Nhập giá"
+                  required
+                />
+              </div>
+            </div>
+            <div className="flex justify-end gap-2 pt-4">
+              <Button
+                type="button"
+                variant="outline"
+                onClick={() => setIsEditingEbook(false)}
+              >
+                Hủy
+              </Button>
+              <Button
+                type="submit"
+                disabled={createUpdateEbookMutation.isPending}
+              >
+                {createUpdateEbookMutation.isPending ? (
+                  <>
+                    <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                    Đang lưu...
+                  </>
+                ) : (
+                  "Lưu"
+                )}
+              </Button>
+            </div>
+          </form>
+        </DialogContent>
+      </Dialog>
     </Dialog>
   );
 }
