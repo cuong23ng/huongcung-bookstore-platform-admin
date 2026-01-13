@@ -12,7 +12,7 @@ import {
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from "./ui/dropdown-menu";
-import { Loader2, Sparkles, CheckCircle, XCircle, Edit, Wand2, RefreshCw, ArrowUp, ArrowDown, Upload, X, Save, BookOpen, BookMarked } from "lucide-react";
+import { Loader2, Sparkles, CheckCircle, XCircle, Edit, Wand2, RefreshCw, ArrowUp, ArrowDown, Upload, X, Save, BookOpen, BookMarked, Eye, EyeOff } from "lucide-react";
 import { CatalogService } from "../services/CatalogService";
 import { ReviewService } from "../services/ReviewService";
 import { useToast } from "../hooks/use-toast";
@@ -22,16 +22,12 @@ interface BookDetailsDialogProps {
   readonly open: boolean;
   readonly onOpenChange: (open: boolean) => void;
   readonly bookId: number | null;
-  readonly onGenerateAiReview: (bookId: number) => void;
-  readonly isGeneratingReview: boolean;
 }
 
 export function BookDetailsDialog({
   open,
   onOpenChange,
   bookId,
-  onGenerateAiReview,
-  isGeneratingReview,
 }: BookDetailsDialogProps) {
   const { toast } = useToast();
   const queryClient = useQueryClient();
@@ -367,6 +363,34 @@ export function BookDetailsDialog({
     },
   });
 
+  // Update book status mutation
+  const updateBookStatusMutation = useMutation({
+    mutationFn: (status: 'PUBLISHED' | 'UNPUBLISHED') => bookId 
+      ? CatalogService.getInstance().updateBookStatus(bookId, status)
+      : Promise.reject(new Error("Book ID is required")),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['bookDetails', bookId] });
+      queryClient.invalidateQueries({ queryKey: ['books'] });
+      toast({ 
+        title: "Cập nhật trạng thái sách thành công", 
+        description: "Trạng thái sách đã được cập nhật",
+      });
+    },
+    onError: (error: Error) => {
+      toast({ 
+        title: "Lỗi cập nhật trạng thái", 
+        description: error.message, 
+        variant: "destructive" 
+      });
+    },
+  });
+
+  const handleStatusToggle = () => {
+    if (!bookDetails) return;
+    const newStatus = bookDetails.status === 'PUBLISHED' ? 'UNPUBLISHED' : 'PUBLISHED';
+    updateBookStatusMutation.mutate(newStatus);
+  };
+
   const handleRefresh = () => {
     refetchReview();
     refetchBookDetails();
@@ -460,6 +484,38 @@ export function BookDetailsDialog({
                     <p className="text-sm">{bookDetails.publisher.name}</p>
                   </div>
                 )}
+                <div className="col-span-2">
+                  <div className="flex items-center gap-2">
+                    <p className="text-sm font-medium text-muted-foreground">Trạng thái</p>
+                    <Badge 
+                      variant={bookDetails.status === 'PUBLISHED' ? 'default' : 'secondary'}
+                      className={bookDetails.status === 'PUBLISHED' ? 'bg-green-500 hover:bg-green-600' : ''}
+                    >
+                      {bookDetails.status === 'PUBLISHED' ? 'Đã xuất bản' : bookDetails.status === 'UNPUBLISHED' ? 'Chưa xuất bản' : '-'}
+                    </Badge>
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={handleStatusToggle}
+                      disabled={updateBookStatusMutation.isPending}
+                      title={bookDetails.status === 'PUBLISHED' ? 'Ẩn sách' : 'Đăng bán'}
+                    >
+                      {updateBookStatusMutation.isPending ? (
+                        <Loader2 className="h-4 w-4 animate-spin mr-2" />
+                      ) : bookDetails.status === 'PUBLISHED' ? (
+                        <>
+                          <EyeOff className="h-4 w-4 mr-2" />
+                          Ẩn sách
+                        </>
+                      ) : (
+                        <>
+                          <Eye className="h-4 w-4 mr-2" />
+                          Đăng bán
+                        </>
+                      )}
+                    </Button>
+                  </div>
+                </div>
               </div>
 
               {/* Images */}
@@ -758,281 +814,7 @@ export function BookDetailsDialog({
                 <p className="text-sm text-muted-foreground">Chưa có thông tin sách điện tử</p>
               )}
             </div>
-
-            {/* Review Section */}
-            {/* <div className="space-y-4">
-              <div className="flex items-center justify-between border-b pb-2">
-                <div className="flex items-center gap-3">
-                  <h3 className="text-lg font-semibold">Đánh giá sách</h3>
-                  {!isLoadingReview && review && (
-                    <Badge
-                      variant={
-                        review.status === 'PUBLISHED'
-                          ? 'default'
-                          : review.status === 'DRAFT'
-                          ? 'secondary'
-                          : review.status === 'RETRACT'
-                          ? 'destructive'
-                          : 'outline'
-                      }
-                    >
-                      {review.status === 'DRAFT' && 'DRAFT'}
-                      {review.status === 'PUBLISHED' && 'PUBLISHED'}
-                      {review.status === 'REJECTED' && 'REJECTED'}
-                      {review.status === 'RETRACT' && 'RETRACT'}
-                    </Badge>
-                  )}
-                </div>
-                <div className="flex items-center gap-2">
-                  {!isEditingReview && review && (
-                    <Button
-                      variant="ghost"
-                      size="icon"
-                      onClick={() => setIsEditingReview(true)}
-                      disabled={review.status === 'PUBLISHED'}
-                    >
-                      <Edit className="h-4 w-4 mr-2" />
-                    </Button>
-                  )}
-                  <DropdownMenu>
-                    <DropdownMenuTrigger asChild>
-                      <Button
-                        variant="ghost"
-                        size="icon"
-                        disabled={isGeneratingReview || enhanceReviewMutation.isPending || !bookId}
-                        title="AI Tools"
-                      >
-                        {isGeneratingReview || enhanceReviewMutation.isPending ? (
-                          <Loader2 className="h-4 w-4 animate-spin" />
-                        ) : (
-                          <Sparkles className="h-4 w-4" />
-                        )}
-                      </Button>
-                    </DropdownMenuTrigger>
-                    <DropdownMenuContent align="end">
-                      <DropdownMenuItem
-                        onClick={() => bookId && onGenerateAiReview(bookId)}
-                        disabled={isGeneratingReview || !bookId}
-                      >
-                        <Sparkles className="h-4 w-4 mr-2" />
-                        Giúp tôi viết
-                      </DropdownMenuItem>
-                      <DropdownMenuItem
-                        onClick={() => enhanceReviewMutation.mutate('improve')}
-                        disabled={!hasMinimumWords || enhanceReviewMutation.isPending || !bookId}
-                      >
-                        <Wand2 className="h-4 w-4 mr-2" />
-                        Cải thiện/Hoàn thiện
-                      </DropdownMenuItem>
-                      <DropdownMenuItem
-                        onClick={() => enhanceReviewMutation.mutate('expand')}
-                        disabled={!hasMinimumWords || enhanceReviewMutation.isPending || !bookId}
-                      >
-                        <ArrowUp className="h-4 w-4 mr-2" />
-                        Mở rộng
-                      </DropdownMenuItem>
-                      <DropdownMenuItem
-                        onClick={() => enhanceReviewMutation.mutate('shorten')}
-                        disabled={!hasMinimumWords || enhanceReviewMutation.isPending || !bookId}
-                      >
-                        <ArrowDown className="h-4 w-4 mr-2" />
-                        Rút gọn
-                      </DropdownMenuItem>
-                    </DropdownMenuContent>
-                  </DropdownMenu>
-                  <Button
-                    variant="ghost"
-                    size="icon"
-                    onClick={handleRefresh}
-                    title="Làm mới"
-                  >
-                    <RefreshCw className="h-4 w-4" />
-                  </Button>
-                </div>
-              </div>
-
-              {isLoadingReview && (
-                <div className="flex items-center justify-center py-8">
-                  <Loader2 className="h-5 w-5 animate-spin mr-2" />
-                  <span>Đang tải review...</span>
-                </div>
-              )}
-
-              {!isLoadingReview && !review && !isEditingReview && (
-                <div className="text-center py-8 border rounded-md">
-                  <p className="text-muted-foreground">Chưa có review cho sách này</p>
-                  <div className="flex gap-2 justify-center mt-4">
-                    <Button
-                      variant="outline"
-                      size="sm"
-                      onClick={() => setIsEditingReview(true)}
-                    >
-                      <Edit className="h-4 w-4 mr-2" />
-                      Viết review
-                    </Button>
-                    <Button
-                      variant="outline"
-                      size="sm"
-                      onClick={() => bookId && onGenerateAiReview(bookId)}
-                      disabled={isGeneratingReview || !bookId}
-                    >
-                      <Sparkles className="h-4 w-4 mr-2" />
-                      AI Tạo review
-                    </Button>
-                  </div>
-                </div>
-              )}
-
-              {isEditingReview && (
-                <Card>
-                  <CardContent className="pt-4">
-                    <form onSubmit={handleSaveReview} className="space-y-4">
-                      <div className="space-y-2">
-                        <Label htmlFor="reviewRating">Đánh giá (1-5 sao)</Label>
-                        <Input
-                          id="reviewRating"
-                          type="number"
-                          min="1"
-                          max="5"
-                          value={reviewRating || ""}
-                          onChange={(e) => setReviewRating(e.target.value ? Number(e.target.value) : undefined)}
-                          placeholder="Nhập điểm từ 1 đến 5"
-                        />
-                      </div>
-                      <div className="space-y-2">
-                        <Label htmlFor="reviewContent">Nội dung review</Label>
-                        <textarea
-                          id="reviewContent"
-                          className="flex min-h-[150px] w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50"
-                          value={reviewContent}
-                          onChange={(e) => setReviewContent(e.target.value)}
-                          placeholder="Nhập nội dung review..."
-                        />
-                      </div>
-                      <div className="flex justify-end gap-2">
-                        <Button
-                          type="button"
-                          variant="outline"
-                          onClick={() => {
-                            setIsEditingReview(false);
-                            if (review) {
-                              setReviewContent(review.content || "");
-                              setReviewRating(review.rating);
-                            } else {
-                              setReviewContent("");
-                              setReviewRating(undefined);
-                            }
-                          }}
-                        >
-                          Hủy
-                        </Button>
-                        <Button
-                          type="submit"
-                          disabled={createReviewMutation.isPending || updateReviewMutation.isPending}
-                        >
-                          {(() => {
-                            if (createReviewMutation.isPending || updateReviewMutation.isPending) {
-                              return "Đang lưu...";
-                            }
-                            if (review) {
-                              return "Cập nhật";
-                            }
-                            return "Tạo review";
-                          })()}
-                        </Button>
-                      </div>
-                    </form>
-                  </CardContent>
-                </Card>
-              )}
-
-              {!isLoadingReview && review && !isEditingReview && (
-                <Card className={(() => {
-                  if (review.status === 'DRAFT') return "border-l-4 border-l-primary";
-                  if (review.status === 'PUBLISHED') return "border-l-4 border-l-green-500";
-                  if (review.status === 'RETRACT') return "border-l-4 border-l-orange-500";
-                  return "";
-                })()}>
-                  <CardContent className="pt-4">
-                    <div className="space-y-3">
-                      <div className="flex items-start justify-between">
-                        <div className="flex-1">
-                          {review.rating && (
-                            <div className="flex items-center gap-1 mb-2">
-                              <span className="text-sm font-medium">{review.rating}</span>
-                              <span className="text-yellow-500">★</span>
-                            </div>
-                          )}
-                          {review.title && (
-                            <h4 className="text-base font-semibold mb-2">{review.title}</h4>
-                          )}
-                          {review.content && (
-                            <p className="text-sm whitespace-pre-wrap">{review.content}</p>
-                          )}
-                          {review.sources && review.sources.length > 0 && (
-                            <div className="mt-2">
-                              <p className="text-xs font-medium text-muted-foreground mb-1">Nguồn tham khảo:</p>
-                              <ul className="text-xs text-muted-foreground list-disc list-inside">
-                                {review.sources.map((source, idx) => (
-                                  <li key={`${review.id}-source-${idx}`}>
-                                    {source.url ? (
-                                      <a 
-                                        href={source.url} 
-                                        target="_blank" 
-                                        rel="noopener noreferrer"
-                                        className="hover:underline"
-                                      >
-                                        {source.title || source.url}
-                                      </a>
-                                    ) : (
-                                      source.title || 'Nguồn không có tiêu đề'
-                                    )}
-                                  </li>
-                                ))}
-                              </ul>
-                            </div>
-                          )}
-                          {review.createdAt && (
-                            <p className="text-xs text-muted-foreground mt-2">
-                              Tạo lúc: {new Date(review.createdAt).toLocaleString('vi-VN')}
-                            </p>
-                          )}
-                          {review.updatedAt && review.updatedAt !== review.createdAt && (
-                            <p className="text-xs text-muted-foreground">
-                              Cập nhật lúc: {new Date(review.updatedAt).toLocaleString('vi-VN')}
-                            </p>
-                          )}
-                        </div>
-                      </div>
-                      {review.status === 'DRAFT' && (
-                        <div className="flex gap-2 pt-2 border-t">
-                          <Button
-                            variant="default"
-                            size="sm"
-                            onClick={() => review.id && approveReviewMutation.mutate(review.id)}
-                            disabled={approveReviewMutation.isPending || rejectReviewMutation.isPending}
-                            className="flex-1"
-                          >
-                            <CheckCircle className="h-4 w-4 mr-1" />
-                            {approveReviewMutation.isPending ? "Đang duyệt..." : "Duyệt"}
-                          </Button>
-                          <Button
-                            variant="destructive"
-                            size="sm"
-                            onClick={() => review.id && rejectReviewMutation.mutate(review.id)}
-                            disabled={approveReviewMutation.isPending || rejectReviewMutation.isPending}
-                            className="flex-1"
-                          >
-                            <XCircle className="h-4 w-4 mr-1" />
-                            {rejectReviewMutation.isPending ? "Đang từ chối..." : "Từ chối"}
-                          </Button>
-                        </div>
-                      )}
-                    </div>
-                  </CardContent>
-                </Card>
-              )}
-            </div> */}
+            
           </div>
         )}
         {!isLoadingBookDetails && !bookDetails && (

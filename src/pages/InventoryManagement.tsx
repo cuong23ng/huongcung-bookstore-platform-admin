@@ -15,6 +15,7 @@ import { InventoryService } from "../services/InventoryService";
 import { getAuthData } from "../services/AdminAuthService";
 import type { StockLevel, City, StockAdjustmentRequest, StockAdjustment } from "../models";
 import { Badge } from "../components/ui/badge";
+import { Header } from "../components/Header";
 
 export default function InventoryManagement() {
   const navigate = useNavigate();
@@ -304,7 +305,7 @@ export default function InventoryManagement() {
 
   return (
     <div className="min-h-screen bg-background">
-      <header className="border-b bg-card">
+      {/* <header className="border-b bg-card">
         <div className="container mx-auto px-4 py-4">
           <Button variant="ghost" onClick={() => navigate("/admin/dashboard")} className="mb-2">
             <ArrowLeft className="mr-2 h-4 w-4" />
@@ -312,15 +313,16 @@ export default function InventoryManagement() {
           </Button>
           <h1 className="text-2xl font-bold text-foreground">Quản lý kho</h1>
         </div>
-      </header>
+      </header> */}
+      <Header />
 
       <main className="container mx-auto px-4 py-8">
         <Card>
           <CardHeader>
             <div className="flex justify-between items-center">
               <div>
-                <CardTitle>Mức tồn kho</CardTitle>
-                <CardDescription>
+                <CardTitle className="mb-4">Mức tồn kho</CardTitle>
+                <CardDescription className="mb-4">
                   {userRole === 'store_manager' 
                     ? `Tồn kho tại ${getCityLabel(userCity || '')}` 
                     : 'Quản lý tồn kho theo thành phố'}

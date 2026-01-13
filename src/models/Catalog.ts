@@ -10,6 +10,7 @@ export interface Book {
   hasEbookEdition: boolean;
   language: string;
   publishedDate?: string;
+  status?: 'PUBLISHED' | 'UNPUBLISHED';
   authors?: Author[];
   translators?: Translator[];
   publisher?: Publisher;
@@ -213,6 +214,7 @@ export interface BookDetail {
   language: string;
   edition: number;
   pageCount: number;
+  status?: 'PUBLISHED' | 'UNPUBLISHED';
   authors?: Author[];
   translators?: Translator[];
   genres?: Genre[];

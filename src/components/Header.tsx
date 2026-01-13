@@ -3,11 +3,10 @@ import { Button } from "./ui/button";
 import { UserRound, Menu, ShoppingBag, Bell, User, Package, LogOut } from "lucide-react";
 import { SidebarTrigger } from "./ui/sidebar";
 import { ThemeToggle } from "./ThemeToggle";
-import { SearchBar } from "./SearchBar";
 import { useNavigate } from "react-router-dom";
 import { useToast } from "../hooks/use-toast";
-import { UserInfo, getAuthData, logout } from "../services/AuthService";
-import { useCart } from "../contexts/CartContext";
+import { getAuthData, logout } from "../services/AdminAuthService";
+import type { LoginRequest, AuthResponse, AdminUserInfo } from '../models/AdminAuth';
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -20,11 +19,9 @@ import {
 export const Header = () => {
   const navigate = useNavigate();
   const { toast } = useToast();
-  const [user, setUser] = useState<UserInfo | null>(null);
-  const { itemCount } = useCart();
+  const [user, setUser] = useState<AdminUserInfo | null>(null);
 
   useEffect(() => {
-    // Get user information from localStorage
     const userData = getAuthData();
     setUser(userData);
   }, []);
@@ -64,31 +61,13 @@ export const Header = () => {
               <Menu className="h-5 w-5" />
             </SidebarTrigger>
             <h1 className="text-xl font-light tracking-wider">
-              Hương Cung Book
+              Hương Cung Book Backoffice
             </h1>
-          </div>
-
-          {/* Center Search Bar */}
-          <div className="flex-1 max-w-md mx-8 hidden md:block">
-            <SearchBar />
           </div>
 
           {/* Actions */}
           <div className="flex items-center gap-4">
             <ThemeToggle />
-            <Button 
-              variant="ghost" 
-              size="icon" 
-              className="!hover:bg-transparent relative"
-              onClick={() => navigate("/cart")}
-            >
-              <ShoppingBag className="h-5 w-5" />
-              {itemCount > 0 && (
-                <span className="absolute -top-1 -right-1 h-5 w-5 rounded-full bg-primary text-primary-foreground text-xs font-medium flex items-center justify-center">
-                  {itemCount > 99 ? "99+" : itemCount}
-                </span>
-              )}
-            </Button>
 
             {/* Only show these buttons when user is logged in */}
             {user && (
@@ -119,11 +98,6 @@ export const Header = () => {
                   <DropdownMenuItem onClick={() => navigate("/profile")}>
                     <UserRound className="mr-2 h-4 w-4" />
                     <span>Thông tin cá nhân</span>
-                  </DropdownMenuItem>
-
-                  <DropdownMenuItem onClick={() => navigate("/orders")}>
-                    <Package className="mr-2 h-4 w-4" />
-                    <span>Lịch sử đơn hàng</span>
                   </DropdownMenuItem>
 
                   <DropdownMenuSeparator />

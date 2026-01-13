@@ -1,6 +1,7 @@
 import { ApiClient } from '../integrations/ApiClient';
-import { Staff, CreateStaffRequest, UpdateStaffRequest, ApiResponse } from '../models';
-import { AxiosInstance, AxiosError } from 'axios';
+import type { Staff, CreateStaffRequest, UpdateStaffRequest, ApiResponse, GetStaffResponse, GetAllStaffParams } from '../models';
+import type { AxiosInstance } from 'axios';
+import { AxiosError } from 'axios';
 
 export class StaffService {
   private readonly apiFetcher: AxiosInstance;
@@ -13,46 +14,65 @@ export class StaffService {
     return new StaffService();
   }
 
-  public async getAllStaff(): Promise<Staff[]> {
+  public async getAllStaff(params?: GetAllStaffParams): Promise<GetStaffResponse> {
     try {
-      // Backend returns: { data: { staff: [...], pagination: {...} }, message?: string, errorCode?: string }
-      const response = await this.apiFetcher.get<any>('/admin/staff');
+      // Build query parameters
+      const queryParams: any = {};
+      if (params?.page !== undefined) {
+        queryParams.page = params.page;
+      }
+      if (params?.size !== undefined) {
+        queryParams.size = params.size;
+      }
+      if (params?.staffType) {
+        queryParams.staffType = params.staffType;
+      }
+      if (params?.assignedCity) {
+        queryParams.assignedCity = params.assignedCity;
+      }
+      if (params?.warehouse) {
+        queryParams.warehouse = params.warehouse;
+      }
+
+      // Backend returns: { data: { staffs: [...], pagination: {...} }, message?: string, errorCode?: string }
+      const response = await this.apiFetcher.get<any>('/admin/staff', { params: queryParams });
       
       // Check for error code first
       if (response.data?.errorCode) {
         throw new Error(response.data.message || 'Failed to fetch staff list');
       }
       
-      // Backend returns data in format: { data: { staff: [...], pagination: {...} } }
-      let staffArray: any[] = [];
-      if (response.data?.data) {
-        // Check if data is an object with 'staff' property (paginated response)
-        if (typeof response.data.data === 'object' && 'staff' in response.data.data) {
-          staffArray = response.data.data.staff || [];
-        }
-        // Otherwise, data might be directly the array (fallback for non-paginated)
-        else if (Array.isArray(response.data.data)) {
-          staffArray = response.data.data;
-        }
-      }
-      
-      if (staffArray.length === 0 && !response.data?.data) {
+      // Backend returns data in format: { data: { staffs: [...], pagination: {...} } }
+      if (!response.data?.data) {
         throw new Error('Invalid response format from server');
       }
-      
-      // Transform backend fields to frontend model
-      // Backend: staffType, firstName, lastName, assignedCity
-      // Frontend: role, fullName, city
-      return staffArray.map((staff: any) => ({
+
+      const responseData = response.data.data;
+
+      const staffs = (responseData.staffs || []).map((staff: any) => ({
         id: staff.id,
+        username: staff.username,
         fullName: staff.fullName || `${staff.firstName || ''} ${staff.lastName || ''}`.trim(),
         email: staff.email,
         phone: staff.phone || '',
         role: (staff.role || staff.staffType || '').toUpperCase() as any,
         city: staff.city || staff.assignedCity,
+        warehouse: staff.warehouse || staff.warehouseCode,
         createdAt: staff.createdAt || staff.hireDate,
         updatedAt: staff.updatedAt,
       }));
+
+      return {
+        staffs,
+        pagination: responseData.pagination || {
+          currentPage: 1,
+          pageSize: 20,
+          totalResults: 0,
+          totalPages: 0,
+          hasNext: false,
+          hasPrevious: false,
+        },
+      };
     } catch (error) {
       if (error instanceof AxiosError) {
         const errorMessage = 
@@ -69,55 +89,63 @@ export class StaffService {
   public async createStaff(data: CreateStaffRequest): Promise<Staff> {
     try {
       // Transform frontend format to backend format
-      // Frontend: fullName, role, city
-      // Backend: firstName, lastName, staffType, assignedCity
+
       const fullNameParts = data.fullName.trim().split(/\s+/);
       const firstName = fullNameParts[0] || '';
-      const lastName = fullNameParts.slice(1).join(' ') || '';
+      const lastName = fullNameParts.slice(1).join(' ') || firstName;
       
       // Map role to staffType (backend uses StaffType enum)
-      // Backend expects: STORE_MANAGER, SUPPORT_AGENT (not ADMIN)
       const staffType = data.role === 'ADMIN' 
-        ? 'ADMIN' // This will be rejected by backend, but we'll send it anyway
+        ? 'ADMIN'
         : data.role === 'STORE_MANAGER' 
           ? 'STORE_MANAGER'
           : data.role === 'SUPPORT_AGENT'
             ? 'SUPPORT_AGENT'
-            : data.role;
+            : data.role === 'WAREHOUSE_MANAGER'
+              ? 'WAREHOUSE_MANAGER'
+              : data.role === 'WAREHOUSE_STAFF'
+                ? 'WAREHOUSE_STAFF'
+                : data.role;
+      
+      const username = data.username || data.email;
       
       const backendRequest = {
+        firstName: firstName,
+        lastName: lastName,
+        username: username,
         email: data.email,
         password: data.password,
-        firstName: firstName,
-        lastName: lastName || firstName, // If no lastName, use firstName as fallback
         phone: data.phone,
+        gender: data.gender || 'OTHER',
         staffType: staffType,
-        assignedCity: data.city || undefined,
+        city: data.city || undefined,
+        warehouse: data.warehouseCode || undefined,
       };
       
-      const response = await this.apiFetcher.post<any>('/admin/staff', backendRequest);
+      const response = await this.apiFetcher.post<any>('/admin/auth/register', backendRequest);
       
-      // Backend returns: { data: StaffDTO, message?: string, errorCode?: string }
-      if (response.data?.errorCode) {
-        throw new Error(response.data.message || 'Failed to create staff');
+      if (response.data?.id) {
+        const authData = response.data;
+        const staffDetails = await this.getStaffById(authData.id);
+        return staffDetails;
       }
       
-      if (response.data?.data) {
-        // Transform backend response to frontend format
-        const staffData = response.data.data;
+      if (response.data) {
+        const authData = response.data;
         return {
-          id: staffData.id,
-          fullName: staffData.fullName || `${staffData.firstName || ''} ${staffData.lastName || ''}`.trim(),
-          email: staffData.email,
-          phone: staffData.phone || '',
-          role: (staffData.role || staffData.staffType || '').toUpperCase() as any,
-          city: staffData.city || staffData.assignedCity,
-          createdAt: staffData.createdAt || staffData.hireDate,
-          updatedAt: staffData.updatedAt,
+          id: authData.id,
+          username: authData.username,
+          fullName: `${authData.firstName || ''} ${authData.lastName || ''}`.trim(),
+          email: authData.email,
+          phone: '', // Not in AuthResponse, will be empty
+          role: (authData.roles?.[0] || '').replace('ROLE_', '').toUpperCase() as any,
+          city: undefined, // Not in AuthResponse
+          createdAt: undefined,
+          updatedAt: undefined,
         };
       }
       
-      throw new Error(response.data?.message || 'Failed to create staff');
+      throw new Error('Failed to create staff - invalid response');
     } catch (error) {
       if (error instanceof AxiosError) {
         // Handle validation errors with details
@@ -138,6 +166,37 @@ export class StaffService {
           'Failed to create staff. Please check your input and try again.';
         throw new Error(errorMessage);
       }
+      throw error;
+    }
+  }
+  
+  private async getStaffById(id: number): Promise<Staff> {
+    try {
+      const response = await this.apiFetcher.get<any>(`/admin/staff/${id}`);
+      
+      if (response.data?.errorCode) {
+        throw new Error(response.data.message || 'Failed to fetch staff details');
+      }
+      
+      if (response.data?.data) {
+        const staffData = response.data.data;
+        return {
+          id: staffData.id,
+          username: staffData.username,
+          fullName: staffData.fullName || `${staffData.firstName || ''} ${staffData.lastName || ''}`.trim(),
+          email: staffData.email,
+          phone: staffData.phone || '',
+          role: (staffData.role || staffData.staffType || '').toUpperCase() as any,
+          city: staffData.city || staffData.assignedCity,
+          warehouse: staffData.warehouse || staffData.warehouseCode,
+          createdAt: staffData.createdAt || staffData.hireDate,
+          updatedAt: staffData.updatedAt,
+        };
+      }
+      
+      throw new Error('Invalid response format');
+    } catch (error) {
+      // If getStaffById fails, return empty staff (will be handled by fallback)
       throw error;
     }
   }
@@ -189,11 +248,13 @@ export class StaffService {
         const staffData = response.data.data;
         return {
           id: staffData.id,
+          username: staffData.username,
           fullName: staffData.fullName || `${staffData.firstName || ''} ${staffData.lastName || ''}`.trim(),
           email: staffData.email,
           phone: staffData.phone || '',
           role: (staffData.role || staffData.staffType || '').toUpperCase() as any,
           city: staffData.city || staffData.assignedCity,
+          warehouse: staffData.warehouse || staffData.warehouseCode,
           createdAt: staffData.createdAt || staffData.hireDate,
           updatedAt: staffData.updatedAt,
         };

@@ -1,7 +1,7 @@
 import { Button } from "../ui/button";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "../ui/table";
 import { Badge } from "../ui/badge";
-import { Trash2 } from "lucide-react";
+import { Trash2, Loader2, Eye, EyeOff } from "lucide-react";
 import type { Book, Author } from "../../models";
 
 interface BooksTableProps {
@@ -10,6 +10,8 @@ interface BooksTableProps {
   readonly error: Error | null;
   readonly onViewDetails: (bookId: number) => void;
   readonly onDelete: (bookId: number, bookTitle: string) => void;
+  readonly onStatusUpdate: (bookId: number, currentStatus: 'PUBLISHED' | 'UNPUBLISHED' | undefined) => void;
+  readonly isUpdatingStatus: boolean;
 }
 
 export function BooksTable({
@@ -18,6 +20,8 @@ export function BooksTable({
   error,
   onViewDetails,
   onDelete,
+  onStatusUpdate,
+  isUpdatingStatus,
 }: BooksTableProps) {
   if (isLoading) {
     return <div className="text-center py-8">Đang tải...</div>;
@@ -48,6 +52,7 @@ export function BooksTable({
           <TableHead>Tác giả</TableHead>
           <TableHead>Loại</TableHead>
           <TableHead>Ngôn ngữ</TableHead>
+          <TableHead>Trạng thái</TableHead>
           <TableHead className="text-right">Thao tác</TableHead>
         </TableRow>
       </TableHeader>
@@ -92,14 +97,39 @@ export function BooksTable({
             <TableCell>
               <span className="text-sm">{book.language || '-'}</span>
             </TableCell>
-            <TableCell className="text-right">
-              <Button
-                variant="ghost"
-                size="sm"
-                onClick={() => onDelete(book.id, book.title)}
+            <TableCell>
+              <Badge 
+                variant={book.status === 'PUBLISHED' ? 'default' : 'secondary'}
+                className={book.status === 'PUBLISHED' ? 'bg-green-500 hover:bg-green-600' : ''}
               >
-                <Trash2 className="h-4 w-4 text-destructive" />
-              </Button>
+                {book.status ? book.status : "-"}
+              </Badge>
+            </TableCell>
+            <TableCell className="text-right">
+              <div className="flex justify-end gap-2">
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  onClick={() => onStatusUpdate(book.id, book.status)}
+                  disabled={isUpdatingStatus}
+                  title={book.status === 'PUBLISHED' ? 'Ẩn sách' : 'Xuất bản sách'}
+                >
+                  {isUpdatingStatus ? (
+                    <Loader2 className="h-4 w-4 animate-spin" />
+                  ) : book.status === 'PUBLISHED' ? (
+                    <EyeOff className="h-4 w-4" />
+                  ) : (
+                    <Eye className="h-4 w-4" />
+                  )}
+                </Button>
+                {/* <Button
+                  variant="ghost"
+                  size="sm"
+                  onClick={() => onDelete(book.id, book.title)}
+                >
+                  <Trash2 className="h-4 w-4 text-destructive" />
+                </Button> */}
+              </div>
             </TableCell>
           </TableRow>
         ))}

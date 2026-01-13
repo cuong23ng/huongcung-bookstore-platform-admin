@@ -11,6 +11,7 @@ import { RevenueChart } from "../components/dashboard/RevenueChart";
 import { OrderStatusChart } from "../components/dashboard/OrderStatusChart";
 import { TopSellingBooksChart } from "../components/dashboard/TopSellingBooksChart";
 import { OrderTrendChart } from "../components/dashboard/OrderTrendChart";
+import { Header } from "../components/Header";
 
 export default function AdminDashboard() {
   const navigate = useNavigate();
@@ -98,7 +99,7 @@ export default function AdminDashboard() {
 
   return (
     <div className="min-h-screen bg-background">
-      <header className="border-b bg-card">
+      {/* <header className="border-b bg-card">
         <div className="container mx-auto px-4 py-4 flex justify-between items-center">
           <div>
             <h1 className="text-2xl font-bold text-foreground">Hệ thống quản lý - Hương Cung Bookstore</h1>
@@ -112,12 +113,10 @@ export default function AdminDashboard() {
             Đăng xuất
           </Button>
         </div>
-      </header>
+      </header> */}
+      <Header />
 
       <main className="container mx-auto px-4 py-8">
-        <div className="mb-8">
-          <h2 className="text-3xl font-bold mb-2">Chào mừng, {staffInfo?.fullName}!</h2>
-        </div>
 
         {/* Dashboard Charts Section */}
         {(userRole === "admin") && (

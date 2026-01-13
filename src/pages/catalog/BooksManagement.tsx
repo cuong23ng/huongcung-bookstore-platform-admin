@@ -1,51 +1,44 @@
-import { useEffect, useState } from "react";
+import { useEffect, useState, useDeferredValue } from "react";
 import { useNavigate } from "react-router-dom";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
-import { Button } from "../components/ui/button";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "../components/ui/card";
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "../components/ui/tabs";
-import { BookDetailsDialog } from "../components/BookDetailsDialog";
-import { BooksTable } from "../components/catalog/BooksTable";
-import { AuthorsTable } from "../components/catalog/AuthorsTable";
-import { GenresTable } from "../components/catalog/GenresTable";
-import { BookFormDialog } from "../components/catalog/BookFormDialog";
-import { AuthorFormDialog } from "../components/catalog/AuthorFormDialog";
-import { GenreFormDialog } from "../components/catalog/GenreFormDialog";
-import { useToast } from "../hooks/use-toast";
-import { ArrowLeft } from "lucide-react";
-import { CatalogService } from "../services/CatalogService";
-import { getAuthData } from "../services/AdminAuthService";
-import { Header } from "../components/Header";
-import type { CreateBookRequest, Book, Author, Genre, Publisher, Translator, BookImageData, CreateAuthorRequest, CreateGenreRequest, ImageData } from "../models";
+import { Button } from "../../components/ui/button";
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "../../components/ui/card";
+import { Input } from "../../components/ui/input";
+import { Label } from "../../components/ui/label";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "../../components/ui/select";
+import { BookDetailsDialog } from "../../components/BookDetailsDialog";
+import { BooksTable } from "../../components/catalog/BooksTable";
+import { BookFormDialog } from "../../components/catalog/BookFormDialog";
+import { useToast } from "../../hooks/use-toast";
+import { ArrowLeft, Search, X } from "lucide-react";
+import { CatalogService } from "../../services/CatalogService";
+import { getAuthData } from "../../services/AdminAuthService";
+import { Header } from "../../components/Header";
+import type { CreateBookRequest, Book, Author, Genre, Publisher, Translator, BookImageData } from "../../models";
 
-export default function CatalogManagement() {
+export default function BooksManagement() {
   const navigate = useNavigate();
   const { toast } = useToast();
   const queryClient = useQueryClient();
-  const [activeTab, setActiveTab] = useState("books");
   const [dialogOpen, setDialogOpen] = useState(false);
-  const [authorDialogOpen, setAuthorDialogOpen] = useState(false);
-  const [genreDialogOpen, setGenreDialogOpen] = useState(false);
   const [bookDetailsDialogOpen, setBookDetailsDialogOpen] = useState(false);
   const [selectedBookId, setSelectedBookId] = useState<number | null>(null);
   const [selectedImages, setSelectedImages] = useState<File[]>([]);
   const [imagePreviews, setImagePreviews] = useState<string[]>([]);
   
-  // Author form state
-  const [authorFormData, setAuthorFormData] = useState<Partial<CreateAuthorRequest>>({
-    name: "",
-    bio: "",
-    nationality: "",
-    birthDate: "",
-  });
-  const [authorAvatar, setAuthorAvatar] = useState<File | null>(null);
-  const [authorAvatarPreview, setAuthorAvatarPreview] = useState<string | null>(null);
+  // Search and filter states
+  const [searchQuery, setSearchQuery] = useState<string>('');
+  const [selectedLanguage, setSelectedLanguage] = useState<string | undefined>(undefined);
+  const [selectedGenres, setSelectedGenres] = useState<string[]>([]);
   
-  // Genre form state
-  const [genreFormData, setGenreFormData] = useState<Partial<CreateGenreRequest>>({
-    name: "",
-    description: "",
-  });
+  // Deferred value for search to debounce API calls
+  const deferredSearchQuery = useDeferredValue(searchQuery);
   
   // Form state
   const [formData, setFormData] = useState<Partial<CreateBookRequest>>({
@@ -100,9 +93,12 @@ export default function CatalogManagement() {
 
   // Books
   const { data: books = [], isLoading: isLoadingBooks, error: booksError, refetch: refetchBooks } = useQuery({
-    queryKey: ['books'],
-    queryFn: () => CatalogService.getInstance().getAllBooks(),
-    enabled: activeTab === 'books',
+    queryKey: ['books', deferredSearchQuery, selectedLanguage, selectedGenres],
+    queryFn: () => CatalogService.getInstance().getAllBooks({
+      q: deferredSearchQuery || undefined,
+      languages: selectedLanguage ? [selectedLanguage] : undefined,
+      genres: selectedGenres.length > 0 ? selectedGenres : undefined,
+    }),
   });
 
   useEffect(() => {
@@ -115,11 +111,11 @@ export default function CatalogManagement() {
     }
   }, [booksError, isLoadingBooks, toast]);
 
-  // Authors
-  const { data: authors = [], isLoading: isLoadingAuthors, error: authorsError, refetch: refetchAuthors } = useQuery({
+  // Authors (needed for book form)
+  const { data: authors = [], isLoading: isLoadingAuthors, error: authorsError } = useQuery({
     queryKey: ['authors'],
     queryFn: () => CatalogService.getInstance().getAllAuthors(),
-    enabled: activeTab === 'authors' || (activeTab === 'books' && dialogOpen), // Only load when authors tab is active or when book form dialog is open
+    enabled: dialogOpen, // Only load when book form dialog is open
   });
 
   useEffect(() => {
@@ -132,11 +128,11 @@ export default function CatalogManagement() {
     }
   }, [authorsError, isLoadingAuthors, toast]);
 
-  // Genres
-  const { data: genres = [], isLoading: isLoadingGenres, error: genresError, refetch: refetchGenres } = useQuery({
+  // Genres (needed for book form and filter)
+  const { data: genres = [], isLoading: isLoadingGenres, error: genresError } = useQuery({
     queryKey: ['genres'],
     queryFn: () => CatalogService.getInstance().getAllGenres(),
-    enabled: activeTab === 'genres' || (activeTab === 'books' && dialogOpen), // Only load when genres tab is active or when book form dialog is open
+    enabled: true, // Load genres early for filter dropdown
   });
 
   useEffect(() => {
@@ -153,17 +149,17 @@ export default function CatalogManagement() {
   const { data: publishers = [] } = useQuery({
     queryKey: ['publishers'],
     queryFn: () => CatalogService.getInstance().getAllPublishers(),
-    enabled: activeTab === 'books' && dialogOpen, // Only load when book form dialog is open
+    enabled: dialogOpen, // Only load when book form dialog is open
   });
 
   // Translators (only needed for book form)
   const { data: translators = [], isLoading: isLoadingTranslators } = useQuery({
     queryKey: ['translators'],
     queryFn: () => CatalogService.getInstance().getAllTranslators(),
-    enabled: activeTab === 'books' && dialogOpen,
+    enabled: dialogOpen,
   });
 
-  // Delete mutations
+  // Delete book mutation
   const deleteBookMutation = useMutation({
     mutationFn: (id: number) => CatalogService.getInstance().deleteBook(id),
     onSuccess: () => {
@@ -198,28 +194,6 @@ export default function CatalogManagement() {
     updateBookStatusMutation.mutate({ id: bookId, status: newStatus });
   };
 
-  const deleteAuthorMutation = useMutation({
-    mutationFn: (id: number) => CatalogService.getInstance().deleteAuthor(id),
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['authors'] });
-      toast({ title: "Xóa tác giả thành công" });
-    },
-    onError: (error: Error) => {
-      toast({ title: "Lỗi xóa tác giả", description: error.message, variant: "destructive" });
-    },
-  });
-
-  const deleteGenreMutation = useMutation({
-    mutationFn: (id: number) => CatalogService.getInstance().deleteGenre(id),
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['genres'] });
-      toast({ title: "Xóa thể loại thành công" });
-    },
-    onError: (error: Error) => {
-      toast({ title: "Lỗi xóa thể loại", description: error.message, variant: "destructive" });
-    },
-  });
-
   const handleViewBookDetails = (bookId: number) => {
     setSelectedBookId(bookId);
     setBookDetailsDialogOpen(true);
@@ -228,7 +202,7 @@ export default function CatalogManagement() {
   const handleCloseBookDetails = (open: boolean) => {
     setBookDetailsDialogOpen(open);
     if (!open) {
-    setSelectedBookId(null);
+      setSelectedBookId(null);
     }
   };
 
@@ -272,60 +246,9 @@ export default function CatalogManagement() {
     },
   });
 
-  // Create author mutation
-  const createAuthorMutation = useMutation({
-    mutationFn: (data: CreateAuthorRequest) => CatalogService.getInstance().createAuthor(data),
-    onSuccess: async () => {
-      await queryClient.invalidateQueries({ queryKey: ['authors'] });
-      await refetchAuthors();
-      toast({ title: "Thêm tác giả thành công" });
-      setAuthorDialogOpen(false);
-      setAuthorFormData({
-        name: "",
-        bio: "",
-        nationality: "",
-        birthDate: "",
-      });
-      setAuthorAvatar(null);
-      setAuthorAvatarPreview(null);
-    },
-    onError: (error: Error) => {
-      toast({ title: "Lỗi thêm tác giả", description: error.message, variant: "destructive" });
-    },
-  });
-
-  // Create genre mutation
-  const createGenreMutation = useMutation({
-    mutationFn: (data: CreateGenreRequest) => CatalogService.getInstance().createGenre(data),
-    onSuccess: async () => {
-      await queryClient.invalidateQueries({ queryKey: ['genres'] });
-      await refetchGenres();
-      toast({ title: "Thêm thể loại thành công" });
-      setGenreDialogOpen(false);
-      setGenreFormData({
-        name: "",
-        description: "",
-      });
-    },
-    onError: (error: Error) => {
-      toast({ title: "Lỗi thêm thể loại", description: error.message, variant: "destructive" });
-    },
-  });
-
-  const handleDelete = (type: string, id: number, name: string) => {
-    if (!confirm(`Bạn có chắc chắn muốn xóa ${name}?`)) return;
-    
-    switch (type) {
-      case "book":
-        deleteBookMutation.mutate(id);
-        break;
-      case "author":
-        deleteAuthorMutation.mutate(id);
-        break;
-      case "genre":
-        deleteGenreMutation.mutate(id);
-        break;
-    }
+  const handleDelete = (bookId: number, bookTitle: string) => {
+    if (!confirm(`Bạn có chắc chắn muốn xóa ${bookTitle}?`)) return;
+    deleteBookMutation.mutate(bookId);
   };
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -475,88 +398,13 @@ export default function CatalogManagement() {
     });
   };
 
-  const handleAuthorAvatarSelect = async (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
-    if (!file) return;
-
-    if (!file.type.startsWith('image/')) {
-      toast({ 
-        title: "Lỗi", 
-        description: "Vui lòng chọn file ảnh hợp lệ", 
-        variant: "destructive" 
-      });
-      return;
-    }
-
-    setAuthorAvatar(file);
-
-    // Create preview
-    const reader = new FileReader();
-    reader.onload = (e) => {
-      setAuthorAvatarPreview(e.target?.result as string);
-    };
-    reader.readAsDataURL(file);
+  const handleClearFilters = () => {
+    setSearchQuery('');
+    setSelectedLanguage(undefined);
+    setSelectedGenres([]);
   };
 
-  const removeAuthorAvatar = () => {
-    setAuthorAvatar(null);
-    setAuthorAvatarPreview(null);
-  };
-
-  const handleAuthorSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
-    
-    if (!authorFormData.name || !authorFormData.name.trim()) {
-      toast({ title: "Lỗi", description: "Vui lòng nhập tên tác giả", variant: "destructive" });
-      return;
-    }
-
-    // Convert avatar to base64 if provided
-    let imageData: ImageData | undefined = undefined;
-    if (authorAvatar) {
-      try {
-        const base64Data = await convertFileToBase64(authorAvatar);
-        imageData = {
-          fileName: authorAvatar.name,
-          fileType: authorAvatar.type,
-          base64Data: base64Data,
-        };
-      } catch (error) {
-        toast({ 
-          title: "Lỗi", 
-          description: "Không thể chuyển đổi ảnh sang base64", 
-          variant: "destructive" 
-        });
-        return;
-      }
-    }
-
-    const requestData: CreateAuthorRequest = {
-      name: authorFormData.name.trim(),
-      bio: authorFormData.bio?.trim() || undefined,
-      nationality: authorFormData.nationality?.trim() || undefined,
-      birthDate: authorFormData.birthDate || undefined,
-      image: imageData,
-    };
-
-    createAuthorMutation.mutate(requestData);
-  };
-
-  const handleGenreSubmit = (e: React.FormEvent) => {
-    e.preventDefault();
-    
-    if (!genreFormData.name || !genreFormData.name.trim()) {
-      toast({ title: "Lỗi", description: "Vui lòng nhập tên thể loại", variant: "destructive" });
-      return;
-    }
-
-    const requestData: CreateGenreRequest = {
-      name: genreFormData.name.trim(),
-      description: genreFormData.description?.trim() || undefined,
-    };
-
-    createGenreMutation.mutate(requestData);
-  };
+  const hasActiveFilters = searchQuery.trim() !== '' || selectedLanguage !== undefined || selectedGenres.length > 0;
 
   return (
     <div className="min-h-screen bg-background">
@@ -566,7 +414,7 @@ export default function CatalogManagement() {
             <ArrowLeft className="mr-2 h-4 w-4" />
             Quay lại Dashboard
           </Button>
-          <h1 className="text-2xl font-bold text-foreground">Quản lý danh mục</h1>
+          <h1 className="text-2xl font-bold text-foreground">Quản lý sách</h1>
         </div>
       </header> */}
       <Header />
@@ -574,94 +422,130 @@ export default function CatalogManagement() {
       <main className="container mx-auto px-4 py-8">
         <Card>
           <CardHeader>
-            <CardTitle>Danh mục sách</CardTitle>
-            <CardDescription>Quản lý sách, tác giả, và thể loại</CardDescription>
+            <CardTitle>Danh sách sách</CardTitle>
+            <CardDescription>Quản lý thông tin sách trong hệ thống</CardDescription>
           </CardHeader>
           <CardContent>
-              <Tabs value={activeTab} onValueChange={setActiveTab}>
-                <TabsList>
-                  <TabsTrigger value="books">Sách</TabsTrigger>
-                  <TabsTrigger value="authors">Tác giả</TabsTrigger>
-                  <TabsTrigger value="genres">Thể loại</TabsTrigger>
-                </TabsList>
+            {/* Search and Filters Section */}
+            <div className="space-y-4 mb-6">
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                {/* Search Input */}
+                <div className="relative">
+                  <Label htmlFor="search-books">Tìm kiếm sách</Label>
+                  <div className="relative">
+                    <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+                    <Input
+                      id="search-books"
+                      placeholder="Nhập tên sách..."
+                      value={searchQuery}
+                      onChange={(e) => setSearchQuery(e.target.value)}
+                      className="pl-9 pr-9"
+                    />
+                    {searchQuery && (
+                      <button
+                        onClick={() => setSearchQuery('')}
+                        className="absolute right-3 top-1/2 transform -translate-y-1/2 text-muted-foreground hover:text-foreground"
+                      >
+                        <X className="h-4 w-4" />
+                      </button>
+                    )}
+                  </div>
+                </div>
 
-                <TabsContent value="books" className="mt-4">
-                    <div className="flex justify-end mb-4">
-                      <BookFormDialog
-                        open={dialogOpen}
-                        onOpenChange={setDialogOpen}
-                        formData={formData}
-                        onFormDataChange={setFormData}
-                        imagePreviews={imagePreviews}
-                        onImageSelect={handleImageSelect}
-                        onImageRemove={removeImage}
-                        authors={authors as Author[]}
-                        isLoadingAuthors={isLoadingAuthors}
-                        translators={translators as Translator[]}
-                        isLoadingTranslators={isLoadingTranslators}
-                        publishers={publishers as Publisher[]}
-                        genres={genres as Genre[]}
-                        isLoadingGenres={isLoadingGenres}
-                        onToggleAuthor={toggleAuthor}
-                        onToggleTranslator={toggleTranslator}
-                        onToggleGenre={toggleGenre}
-                        onSubmit={handleSubmit}
-                        isSubmitting={createBookMutation.isPending}
-                              />
-                            </div>
-                  <BooksTable
-                    books={books as Book[]}
-                    isLoading={isLoadingBooks}
-                    error={booksError}
-                    onViewDetails={handleViewBookDetails}
-                    onDelete={(bookId, bookTitle) => handleDelete("book", bookId, bookTitle)}
-                    onStatusUpdate={handleStatusUpdate}
-                    isUpdatingStatus={updateBookStatusMutation.isPending}
-                  />
-                </TabsContent>
+                {/* Language Filter */}
+                <div>
+                  <Label htmlFor="language-filter">Ngôn ngữ</Label>
+                  <Select
+                    value={selectedLanguage || 'all'}
+                    onValueChange={(value) => setSelectedLanguage(value === 'all' ? undefined : value)}
+                  >
+                    <SelectTrigger id="language-filter">
+                      <SelectValue placeholder="Tất cả ngôn ngữ" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="all">Tất cả ngôn ngữ</SelectItem>
+                      <SelectItem value="VIETNAMESE">Tiếng Việt</SelectItem>
+                      <SelectItem value="ENGLISH">Tiếng Anh</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
 
-              <TabsContent value="authors" className="mt-4">
-                <div className="flex justify-end mb-4">
-                  <AuthorFormDialog
-                    open={authorDialogOpen}
-                    onOpenChange={setAuthorDialogOpen}
-                    formData={authorFormData}
-                    onFormDataChange={setAuthorFormData}
-                    avatar={authorAvatar}
-                    avatarPreview={authorAvatarPreview}
-                    onAvatarSelect={handleAuthorAvatarSelect}
-                    onAvatarRemove={removeAuthorAvatar}
-                    onSubmit={handleAuthorSubmit}
-                    isSubmitting={createAuthorMutation.isPending}
-                          />
-                        </div>
-                <AuthorsTable
-                  authors={authors as Author[]}
-                  isLoading={isLoadingAuthors}
-                  error={authorsError}
-                  onDelete={(authorId, authorName) => handleDelete("author", authorId, authorName)}
-                />
-              </TabsContent>
+                {/* Genre Filter */}
+                <div>
+                  <Label htmlFor="genre-filter">Thể loại</Label>
+                  <Select
+                    value={selectedGenres.length > 0 ? selectedGenres[0] : 'all'}
+                    onValueChange={(value) => {
+                      if (value === 'all') {
+                        setSelectedGenres([]);
+                      } else {
+                        setSelectedGenres([value]);
+                      }
+                    }}
+                  >
+                    <SelectTrigger id="genre-filter">
+                      <SelectValue placeholder="Tất cả thể loại" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="all">Tất cả thể loại</SelectItem>
+                      {genres.map((genre) => (
+                        <SelectItem key={genre.id || genre.code} value={genre.code || genre.name || ''}>
+                          {genre.name || genre.code}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+              </div>
 
-              <TabsContent value="genres" className="mt-4">
-                <div className="flex justify-end mb-4">
-                  <GenreFormDialog
-                    open={genreDialogOpen}
-                    onOpenChange={setGenreDialogOpen}
-                    formData={genreFormData}
-                    onFormDataChange={setGenreFormData}
-                    onSubmit={handleGenreSubmit}
-                    isSubmitting={createGenreMutation.isPending}
-                          />
-                        </div>
-                <GenresTable
-                  genres={genres as Genre[]}
-                  isLoading={isLoadingGenres}
-                  error={genresError}
-                  onDelete={(genreId, genreName) => handleDelete("genre", genreId, genreName)}
-                />
-              </TabsContent>
-            </Tabs>
+              {/* Clear Filters Button */}
+              {/* {hasActiveFilters && (
+                <div className="flex justify-end">
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={handleClearFilters}
+                    className="gap-2"
+                  >
+                    <X className="h-4 w-4" />
+                    Xóa bộ lọc
+                  </Button>
+                </div>
+              )} */}
+            </div>
+
+            <div className="flex justify-end mb-4">
+              <BookFormDialog
+                open={dialogOpen}
+                onOpenChange={setDialogOpen}
+                formData={formData}
+                onFormDataChange={setFormData}
+                imagePreviews={imagePreviews}
+                onImageSelect={handleImageSelect}
+                onImageRemove={removeImage}
+                authors={authors as Author[]}
+                isLoadingAuthors={isLoadingAuthors}
+                translators={translators as Translator[]}
+                isLoadingTranslators={isLoadingTranslators}
+                publishers={publishers as Publisher[]}
+                genres={genres as Genre[]}
+                isLoadingGenres={isLoadingGenres}
+                onToggleAuthor={toggleAuthor}
+                onToggleTranslator={toggleTranslator}
+                onToggleGenre={toggleGenre}
+                onSubmit={handleSubmit}
+                isSubmitting={createBookMutation.isPending}
+              />
+            </div>
+            <BooksTable
+              books={books as Book[]}
+              isLoading={isLoadingBooks}
+              error={booksError}
+              onViewDetails={handleViewBookDetails}
+              onDelete={handleDelete}
+              onStatusUpdate={handleStatusUpdate}
+              isUpdatingStatus={updateBookStatusMutation.isPending}
+            />
 
             {/* Book Details Dialog */}
             <BookDetailsDialog
@@ -675,4 +559,3 @@ export default function CatalogManagement() {
     </div>
   );
 }
-

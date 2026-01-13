@@ -28,10 +28,29 @@ export class CatalogService {
   }
 
   // Books
-  public async getAllBooks(): Promise<Book[]> {
+  public async getAllBooks(params?: {
+    q?: string;
+    genres?: string[];
+    languages?: string[];
+  }): Promise<Book[]> {
     try {
+      // Build query parameters
+      const queryParams = new URLSearchParams();
+      if (params?.q && params.q.trim()) {
+        queryParams.append('q', params.q.trim());
+      }
+      if (params?.genres && params.genres.length > 0) {
+        params.genres.forEach(genre => queryParams.append('genres', genre));
+      }
+      if (params?.languages && params.languages.length > 0) {
+        params.languages.forEach(lang => queryParams.append('languages', lang));
+      }
+      
+      const queryString = queryParams.toString();
+      const url = `/admin/catalog/books${queryString ? `?${queryString}` : ''}`;
+      
       // Backend returns: { data: { books: [...], pagination: {...} }, message?: string, errorCode?: string }
-      const response = await this.apiFetcher.get<BaseResponse<GetBookCatalogPageResponse>>('/admin/catalog/books');
+      const response = await this.apiFetcher.get<BaseResponse<GetBookCatalogPageResponse>>(url);
       
       // Check for error code first
       if (response.data?.errorCode) {
@@ -158,6 +177,22 @@ export class CatalogService {
       }
     } catch (error) {
       throw this.handleError(error, 'Failed to delete image');
+    }
+  }
+
+  public async updateBookStatus(id: number, status: 'PUBLISHED' | 'UNPUBLISHED'): Promise<void> {
+    try {
+      const response = await this.apiFetcher.put<BaseResponse<null>>(
+        `/admin/catalog/books/${id}/status`,
+        null,
+        { params: { status } }
+      );
+
+      if (response.data?.errorCode) {
+        throw new Error(response.data.message || 'Failed to update book status');
+      }
+    } catch (error) {
+      throw this.handleError(error, 'Failed to update book status');
     }
   }
 

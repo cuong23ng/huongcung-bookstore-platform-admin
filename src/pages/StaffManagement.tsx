@@ -9,9 +9,10 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from ".
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger } from "../components/ui/dialog";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "../components/ui/select";
 import { useToast } from "../hooks/use-toast";
-import { ArrowLeft, Plus, Trash2, Edit } from "lucide-react";
+import { Plus, Trash2, Edit, ChevronLeft, ChevronRight } from "lucide-react";
 import { StaffService } from "../services/StaffService";
 import { getAuthData } from "../services/AdminAuthService";
+import { Header } from "../components/Header";
 import type { Staff, CreateStaffRequest, UpdateStaffRequest, StaffRole, City } from "../models/Staff";
 
 export default function StaffManagement() {
@@ -22,13 +23,25 @@ export default function StaffManagement() {
   const [editMode, setEditMode] = useState(false);
   const [editingStaffId, setEditingStaffId] = useState<number | null>(null);
   
+  // Pagination state
+  const [currentPage, setCurrentPage] = useState(0);
+  const [pageSize] = useState(20);
+  
+  // Filter state
+  const [filterStaffType, setFilterStaffType] = useState<StaffRole | undefined>(undefined);
+  const [filterCity, setFilterCity] = useState<City | undefined>(undefined);
+  const [filterWarehouse, setFilterWarehouse] = useState<string>("");
+  
   // Form state
   const [fullName, setFullName] = useState("");
+  const [username, setUsername] = useState("");
   const [email, setEmail] = useState("");
   const [phone, setPhone] = useState("");
   const [password, setPassword] = useState("");
+  const [gender, setGender] = useState<string>("");
   const [role, setRole] = useState<string>("");
   const [city, setCity] = useState<string>("");
+  const [warehouseCode, setWarehouseCode] = useState<string>("");
 
   // Check admin access
   useEffect(() => {
@@ -44,7 +57,7 @@ export default function StaffManagement() {
       if (userInfo.roles && userInfo.roles.length > 0) {
         userRole = userInfo.roles[0].toLowerCase().replace(/^role_/, '');
       } else {
-        userRole = userInfo.userType.toLowerCase();
+        userRole = userInfo.userType?.toLowerCase() || '';
       }
 
       if (userRole !== 'admin') {
@@ -61,10 +74,19 @@ export default function StaffManagement() {
   }, [navigate, toast]);
 
   // Fetch staff list using React Query
-  const { data: staff = [], isLoading, error, refetch } = useQuery({
-    queryKey: ['staff'],
-    queryFn: () => StaffService.getInstance().getAllStaff(),
+  const { data: staffData, isLoading, error, refetch } = useQuery({
+    queryKey: ['staff', currentPage, pageSize, filterStaffType, filterCity, filterWarehouse],
+    queryFn: () => StaffService.getInstance().getAllStaff({
+      page: currentPage, // 0-based for backend
+      size: pageSize,
+      staffType: filterStaffType,
+      assignedCity: filterCity,
+      warehouse: filterWarehouse || undefined,
+    }),
   });
+
+  const staff = staffData?.staffs || [];
+  const pagination = staffData?.pagination;
 
   // Create staff mutation
   const createMutation = useMutation({
@@ -174,13 +196,36 @@ export default function StaffManagement() {
       return;
     }
 
+    // Warehouse validation for Warehouse Managers and Warehouse Staff
+    if ((role === 'warehouse_manager' || role === 'warehouse_staff') && !warehouseCode) {
+      toast({
+        title: "Lỗi xác thực",
+        description: "Vui lòng chọn kho cho nhân viên kho",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    // Gender validation
+    if (!gender) {
+      toast({
+        title: "Lỗi xác thực",
+        description: "Vui lòng chọn giới tính",
+        variant: "destructive",
+      });
+      return;
+    }
+
     const createData: CreateStaffRequest = {
       fullName,
+      username: username || undefined, // Optional, will use email if not provided
       email,
       phone,
       password,
+      gender,
       role: role.toUpperCase() as StaffRole,
-      city: role === 'store_manager' ? (city as City) : undefined,
+      city: (role === 'store_manager' || role === 'warehouse_manager' || role === 'warehouse_staff') ? (city as City) : undefined,
+      warehouseCode: (role === 'warehouse_manager' || role === 'warehouse_staff') ? warehouseCode : undefined,
     };
 
     createMutation.mutate(createData);
@@ -252,11 +297,14 @@ export default function StaffManagement() {
 
   const resetForm = () => {
     setFullName("");
+    setUsername("");
     setEmail("");
     setPhone("");
     setPassword("");
+    setGender("");
     setRole("");
     setCity("");
+    setWarehouseCode("");
     setEditMode(false);
     setEditingStaffId(null);
   };
@@ -306,7 +354,7 @@ export default function StaffManagement() {
 
   return (
     <div className="min-h-screen bg-background">
-      <header className="border-b bg-card">
+      {/* <header className="border-b bg-card">
         <div className="container mx-auto px-4 py-4">
           <Button variant="ghost" onClick={() => navigate("/admin/dashboard")} className="mb-2">
             <ArrowLeft className="mr-2 h-4 w-4" />
@@ -314,15 +362,16 @@ export default function StaffManagement() {
           </Button>
           <h1 className="text-2xl font-bold text-foreground">Quản lý nhân viên</h1>
         </div>
-      </header>
+      </header> */}
+      <Header />
 
       <main className="container mx-auto px-4 py-8">
         <Card>
           <CardHeader>
             <div className="flex justify-between items-center">
               <div>
-                <CardTitle>Danh sách nhân viên</CardTitle>
-                <CardDescription>Quản lý tài khoản nhân viên hệ thống</CardDescription>
+                <CardTitle className="mb-4">Danh sách nhân viên</CardTitle>
+                <CardDescription className="mb-4">Quản lý tài khoản nhân viên hệ thống</CardDescription>
               </div>
               <Dialog open={dialogOpen} onOpenChange={handleDialogClose}>
                 <DialogTrigger asChild>
@@ -351,6 +400,15 @@ export default function StaffManagement() {
                       />
                     </div>
                     <div className="space-y-2">
+                      <Label htmlFor="username">Username</Label>
+                      <Input
+                        id="username"
+                        type="text"
+                        value={username}
+                        onChange={(e) => setUsername(e.target.value)}
+                      />
+                    </div>
+                    <div className="space-y-2">
                       <Label htmlFor="email">Email *</Label>
                       <Input
                         id="email"
@@ -368,6 +426,19 @@ export default function StaffManagement() {
                         onChange={(e) => setPhone(e.target.value)}
                         required
                       />
+                    </div>
+                    <div className="space-y-2">
+                      <Label htmlFor="gender">Giới tính *</Label>
+                      <Select value={gender} onValueChange={setGender} required>
+                        <SelectTrigger>
+                          <SelectValue placeholder="Chọn giới tính" />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="MALE">Nam</SelectItem>
+                          <SelectItem value="FEMALE">Nữ</SelectItem>
+                          <SelectItem value="OTHER">Khác</SelectItem>
+                        </SelectContent>
+                      </Select>
                     </div>
                     {!editMode && (
                       <div className="space-y-2">
@@ -390,13 +461,14 @@ export default function StaffManagement() {
                           <SelectValue placeholder="Chọn vai trò" />
                         </SelectTrigger>
                         <SelectContent>
-                          <SelectItem value="admin">Quản trị viên</SelectItem>
                           <SelectItem value="store_manager">Quản lý cửa hàng</SelectItem>
                           <SelectItem value="support_agent">Nhân viên hỗ trợ</SelectItem>
+                          <SelectItem value="warehouse_manager">Quản lý kho</SelectItem>
+                          <SelectItem value="warehouse_staff">Nhân viên kho</SelectItem>
                         </SelectContent>
                       </Select>
                     </div>
-                    {role === "store_manager" && (
+                    {(role === "store_manager" || role === "warehouse_manager" || role === "warehouse_staff") && (
                       <div className="space-y-2">
                         <Label htmlFor="city">Thành phố *</Label>
                         <Select value={city} onValueChange={setCity} required>
@@ -404,9 +476,24 @@ export default function StaffManagement() {
                             <SelectValue placeholder="Chọn thành phố" />
                           </SelectTrigger>
                           <SelectContent>
-                            <SelectItem value="Hanoi">Hà Nội</SelectItem>
+                            <SelectItem value="HANOI">Hà Nội</SelectItem>
                             <SelectItem value="HCMC">TP. Hồ Chí Minh</SelectItem>
-                            <SelectItem value="Da Nang">Đà Nẵng</SelectItem>
+                            <SelectItem value="DANANG">Đà Nẵng</SelectItem>
+                          </SelectContent>
+                        </Select>
+                      </div>
+                    )}
+                    {(role === "warehouse_manager" || role === "warehouse_staff") && (
+                      <div className="space-y-2">
+                        <Label htmlFor="warehouse">Kho *</Label>
+                        <Select value={warehouseCode} onValueChange={setWarehouseCode} required>
+                          <SelectTrigger>
+                            <SelectValue placeholder="Chọn kho" />
+                          </SelectTrigger>
+                          <SelectContent>
+                            <SelectItem value="WH-HN-001">WH-HN-001 (Hà Nội)</SelectItem>
+                            <SelectItem value="WH-HCM-001">WH-HCM-001 (TP. Hồ Chí Minh)</SelectItem>
+                            <SelectItem value="WH-DN-001">WH-DN-001 (Đà Nẵng)</SelectItem>
                           </SelectContent>
                         </Select>
                       </div>
@@ -428,6 +515,86 @@ export default function StaffManagement() {
             </div>
           </CardHeader>
           <CardContent>
+            {/* Filters */}
+            <div className="mb-6 grid grid-cols-1 md:grid-cols-4 gap-4">
+              <div className="space-y-2">
+                <Label htmlFor="filter-role">Lọc theo vai trò</Label>
+                <Select
+                  value={filterStaffType || "all"}
+                  onValueChange={(value) => {
+                    setFilterStaffType(value === "all" ? undefined : (value as StaffRole));
+                    setCurrentPage(0);
+                  }}
+                >
+                  <SelectTrigger id="filter-role">
+                    <SelectValue placeholder="Tất cả vai trò" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="all">Tất cả vai trò</SelectItem>
+                    <SelectItem value="ADMIN">Quản trị viên</SelectItem>
+                    <SelectItem value="STORE_MANAGER">Quản lý cửa hàng</SelectItem>
+                    <SelectItem value="WAREHOUSE_MANAGER">Quản lý kho</SelectItem>
+                    <SelectItem value="WAREHOUSE_STAFF">Nhân viên kho</SelectItem>
+                    <SelectItem value="SUPPORT_AGENT">Nhân viên hỗ trợ</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="filter-city">Lọc theo thành phố</Label>
+                <Select
+                  value={filterCity || "all"}
+                  onValueChange={(value) => {
+                    setFilterCity(value === "all" ? undefined : (value as City));
+                    setCurrentPage(0);
+                  }}
+                >
+                  <SelectTrigger id="filter-city">
+                    <SelectValue placeholder="Tất cả thành phố" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="all">Tất cả thành phố</SelectItem>
+                    <SelectItem value="HANOI">Hà Nội</SelectItem>
+                    <SelectItem value="HCMC">TP. Hồ Chí Minh</SelectItem>
+                    <SelectItem value="DANANG">Đà Nẵng</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="filter-warehouse">Kho hàng</Label>
+                <Select
+                  value={filterWarehouse || "all"}
+                  onValueChange={(value) => {
+                    setFilterWarehouse(value === "all" ? "" : value);
+                    setCurrentPage(0);
+                  }}
+                >
+                  <SelectTrigger id="filter-warehouse">
+                    <SelectValue placeholder="Tất cả kho hàng" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="all">Tất cả kho hàng</SelectItem>
+                    <SelectItem value="WH-HN-001">WH-HN-001 (Hà Nội)</SelectItem>
+                    <SelectItem value="WH-HCM-001">WH-HCM-001 (TP. Hồ Chí Minh)</SelectItem>
+                    <SelectItem value="WH-DN-001">WH-DN-001 (Đà Nẵng)</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+              {/* <div className="space-y-2 flex items-end">
+                <Button
+                  variant="outline"
+                  onClick={() => {
+                    setFilterStaffType(undefined);
+                    setFilterCity(undefined);
+                    setFilterWarehouse("");
+                    setCurrentPage(0);
+                  }}
+                  className="w-full"
+                >
+                  Xóa bộ lọc
+                </Button>
+              </div> */}
+            </div>
+
             {isLoading ? (
               <div className="text-center py-8">
                 <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary mx-auto"></div>
@@ -445,26 +612,31 @@ export default function StaffManagement() {
                 <p className="text-muted-foreground">Chưa có nhân viên nào</p>
               </div>
             ) : (
-              <Table>
+              <>
+                <Table>
                 <TableHeader>
                   <TableRow>
                     <TableHead>Họ và tên</TableHead>
+                    <TableHead>Username</TableHead>
                     <TableHead>Email</TableHead>
                     <TableHead>Số điện thoại</TableHead>
                     <TableHead>Vai trò</TableHead>
                     <TableHead>Thành phố</TableHead>
+                    <TableHead>Kho</TableHead>
                     <TableHead>Ngày tạo</TableHead>
                     <TableHead className="text-right">Thao tác</TableHead>
                   </TableRow>
                 </TableHeader>
                 <TableBody>
-                  {staff.map((s) => (
-                    <TableRow key={s.id}>
+                  {staff.map((s, index) => (
+                    <TableRow key={s.id ?? `staff-${index}`}>
                       <TableCell className="font-medium">{s.fullName}</TableCell>
+                      <TableCell>{s.username || "-"}</TableCell>
                       <TableCell>{s.email}</TableCell>
                       <TableCell>{s.phone || "-"}</TableCell>
                       <TableCell>{getRoleLabel(s.role)}</TableCell>
                       <TableCell>{s.city ? getCityLabel(s.city) : "-"}</TableCell>
+                      <TableCell>{s.warehouse || "-"}</TableCell>
                       <TableCell>{formatDate(s.createdAt)}</TableCell>
                       <TableCell className="text-right">
                         <div className="flex justify-end gap-2">
@@ -475,20 +647,51 @@ export default function StaffManagement() {
                           >
                             <Edit className="h-4 w-4" />
                           </Button>
-                          <Button
+                          {/* <Button
                             variant="ghost"
                             size="sm"
                             onClick={() => handleDeleteStaff(s.id)}
                             disabled={deleteMutation.isPending}
                           >
                             <Trash2 className="h-4 w-4 text-destructive" />
-                          </Button>
+                          </Button> */}
                         </div>
                       </TableCell>
                     </TableRow>
                   ))}
                 </TableBody>
               </Table>
+              
+              {/* Pagination */}
+              {pagination && pagination.totalPages > 1 && (
+                <div className="flex items-center justify-between mt-4 pt-4 border-t">
+                  <div className="text-sm text-muted-foreground">
+                    Trang {pagination.currentPage} / {pagination.totalPages} 
+                    {" "}(Tổng: {pagination.totalResults} nhân viên)
+                  </div>
+                  <div className="flex gap-2">
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={() => setCurrentPage(p => Math.max(0, p - 1))}
+                      disabled={!pagination.hasPrevious}
+                    >
+                      <ChevronLeft className="h-4 w-4 mr-1" />
+                      Trước
+                    </Button>
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={() => setCurrentPage(p => Math.min(pagination.totalPages - 1, p + 1))}
+                      disabled={!pagination.hasNext}
+                    >
+                      Sau
+                      <ChevronRight className="h-4 w-4 ml-1" />
+                    </Button>
+                  </div>
+                </div>
+              )}
+              </>
             )}
           </CardContent>
         </Card>
