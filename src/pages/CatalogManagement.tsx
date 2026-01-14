@@ -34,7 +34,7 @@ export default function CatalogManagement() {
   // Author form state
   const [authorFormData, setAuthorFormData] = useState<Partial<CreateAuthorRequest>>({
     name: "",
-    bio: "",
+    biography: "",
     nationality: "",
     birthDate: "",
   });
@@ -282,7 +282,7 @@ export default function CatalogManagement() {
       setAuthorDialogOpen(false);
       setAuthorFormData({
         name: "",
-        bio: "",
+        biography: "",
         nationality: "",
         birthDate: "",
       });
@@ -533,7 +533,7 @@ export default function CatalogManagement() {
 
     const requestData: CreateAuthorRequest = {
       name: authorFormData.name.trim(),
-      bio: authorFormData.bio?.trim() || undefined,
+      biography: authorFormData.biography?.trim() || undefined,
       nationality: authorFormData.nationality?.trim() || undefined,
       birthDate: authorFormData.birthDate || undefined,
       image: imageData,

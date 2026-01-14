@@ -69,7 +69,7 @@ const App = () => (
                   <Route 
                     path="/admin/catalog/books" 
                     element={
-                      <ProtectedRoute requiredRole="admin">
+                      <ProtectedRoute requiredRole={["admin", "customer_support"]}>
                         <BooksManagement />
                       </ProtectedRoute>
                     } 
@@ -77,7 +77,7 @@ const App = () => (
                   <Route 
                     path="/admin/catalog/authors" 
                     element={
-                      <ProtectedRoute requiredRole="admin">
+                      <ProtectedRoute requiredRole={["admin", "customer_support"]}>
                         <AuthorsManagement />
                       </ProtectedRoute>
                     } 
@@ -85,7 +85,7 @@ const App = () => (
                   <Route 
                     path="/admin/catalog/genres" 
                     element={
-                      <ProtectedRoute requiredRole="admin">
+                      <ProtectedRoute requiredRole={["admin", "customer_support"]}>
                         <GenresManagement />
                       </ProtectedRoute>
                     } 
@@ -93,7 +93,7 @@ const App = () => (
                   <Route 
                     path="/admin/inventory" 
                     element={
-                      <ProtectedRoute requiredRole={["admin", "store_manager"]}>
+                      <ProtectedRoute requiredRole={["admin", "store_manager", "warehouse_manager"]}>
                         <InventoryManagement />
                       </ProtectedRoute>
                     } 
@@ -107,7 +107,7 @@ const App = () => (
                   <Route 
                     path="/admin/orders/fulfillment-queue" 
                     element={
-                      <ProtectedRoute requiredRole={["admin", "store_manager"]}>
+                      <ProtectedRoute requiredRole={["admin", "customer_support"]}>
                         <FulfillmentQueue />
                       </ProtectedRoute>
                     } 
@@ -115,7 +115,7 @@ const App = () => (
                   <Route 
                     path="/admin/orders/all" 
                     element={
-                      <ProtectedRoute requiredRole={["admin", "store_manager"]}>
+                      <ProtectedRoute requiredRole={["admin", "customer_support"]}>
                         <AllOrders />
                       </ProtectedRoute>
                     } 
@@ -129,7 +129,7 @@ const App = () => (
                   <Route 
                     path="/admin/consignments/created" 
                     element={
-                      <ProtectedRoute requiredRole={["admin", "store_manager"]}>
+                      <ProtectedRoute requiredRole={["admin", "store_manager", "warehouse_manager"]}>
                         <CreatedConsignments />
                       </ProtectedRoute>
                     } 
@@ -137,19 +137,19 @@ const App = () => (
                   <Route 
                     path="/admin/consignments/all" 
                     element={
-                      <ProtectedRoute requiredRole={["admin", "store_manager"]}>
+                      <ProtectedRoute requiredRole={["admin", "store_manager", "warehouse_manager", "warehouse_staff"]}>
                         <AllConsignments />
                       </ProtectedRoute>
                     } 
                   />
-                  <Route 
+                  {/* <Route 
                     path="/admin/support" 
                     element={
                       <ProtectedRoute requiredRole={["admin", "support_agent"]}>
                         <CustomerSupport />
                       </ProtectedRoute>
                     } 
-                  />
+                  /> */}
                   {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}
                   <Route path="*" element={<NotFound />} />
                 </Routes>

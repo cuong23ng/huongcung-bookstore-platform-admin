@@ -21,7 +21,7 @@ export default function AuthorsManagement() {
   // Author form state
   const [authorFormData, setAuthorFormData] = useState<Partial<CreateAuthorRequest>>({
     name: "",
-    bio: "",
+    biography: "",
     nationality: "",
     birthDate: "",
   });
@@ -92,7 +92,7 @@ export default function AuthorsManagement() {
       setAuthorDialogOpen(false);
       setAuthorFormData({
         name: "",
-        bio: "",
+        biography: "",
         nationality: "",
         birthDate: "",
       });
@@ -181,7 +181,7 @@ export default function AuthorsManagement() {
 
     const requestData: CreateAuthorRequest = {
       name: authorFormData.name.trim(),
-      bio: authorFormData.bio?.trim() || undefined,
+      biography: authorFormData.biography?.trim() || undefined,
       nationality: authorFormData.nationality?.trim() || undefined,
       birthDate: authorFormData.birthDate || undefined,
       image: imageData,

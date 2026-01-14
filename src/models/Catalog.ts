@@ -89,7 +89,7 @@ export interface Author {
 
 export interface CreateAuthorRequest {
   name: string;
-  bio?: string;
+  biography?: string;
   nationality?: string;
   birthDate?: string;
   image?: ImageData;
