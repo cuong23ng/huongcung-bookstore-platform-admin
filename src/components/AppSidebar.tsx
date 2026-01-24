@@ -2,6 +2,7 @@ import { useState, useEffect } from "react";
 import { Users, Book, Package, ShoppingCart, LayoutDashboard, Truck, ChevronRight } from "lucide-react";
 import { NavLink, useLocation, useNavigate } from "react-router-dom";
 import { getAuthData } from "../services/AdminAuthService";
+import { StaffRole } from "../models/Staff";
 
 import {
   Sidebar,
@@ -21,14 +22,6 @@ export function AppSidebar() {
   const location = useLocation();
   const navigate = useNavigate();
   const userInfo = getAuthData();
-  
-  // Get user role - normalize: remove ROLE_ prefix if present and convert to lowercase
-  let userRole = '';
-  if (userInfo?.roles && userInfo.roles.length > 0) {
-    userRole = userInfo.roles[0].toLowerCase().replace(/^role_/, '');
-  } else if (userInfo?.userType) {
-    userRole = userInfo.userType.toLowerCase();
-  }
 
   // Check if catalog submenu should be open
   const isCatalogPath = location.pathname.startsWith('/admin/catalog');
@@ -59,9 +52,9 @@ export function AppSidebar() {
 
   // Define menu items based on role
   const items = [
-    { title: "Dashboard", url: "/admin/dashboard", icon: LayoutDashboard, roles: ['admin', 'store_manager', 'support_agent'] },
-    { title: "Quản lý nhân viên", url: "/admin/staff", icon: Users, roles: ['admin'] },
-    { title: "Quản lý kho", url: "/admin/inventory", icon: Package, roles: ['admin', 'store_manager'] },
+    { title: "Dashboard", url: "/admin/dashboard", icon: LayoutDashboard, roles: ["ROLE_ADMIN", "ROLE_STORE_MANAGER", "ROLE_SUPPORT_AGENT"] },
+    { title: "Quản lý nhân viên", url: "/admin/staff", icon: Users, roles: ["ROLE_ADMIN"] },
+    { title: "Quản lý kho", url: "/admin/inventory", icon: Package, roles: ["ROLE_ADMIN", "ROLE_STORE_MANAGER", "ROLE_WAREHOUSE_MANAGER", "ROLE_WAREHOUSE_STAFF"] },
   ];
 
   // Catalog submenu items
@@ -79,15 +72,16 @@ export function AppSidebar() {
 
   // Consignments submenu items
   const consignmentsSubItems = [
-    { title: "Lô hàng chưa tạo đơn vận chuyển", url: "/admin/consignments/created" },
-    { title: "Tất cả lô hàng", url: "/admin/consignments/all" },
+    { title: "Lô hàng chưa tạo đơn vận chuyển", url: "/admin/consignments/created", roles: ["ROLE_ADMIN", "ROLE_WAREHOUSE_MANAGER", "ROLE_STORE_MANAGER"] },
+    { title: "Tất cả lô hàng", url: "/admin/consignments/all", roles: ["ROLE_ADMIN", "ROLE_STORE_MANAGER", "ROLE_WAREHOUSE_MANAGER", "ROLE_WAREHOUSE_STAFF"] },
   ];
 
   // Filter items based on user role
-  const visibleItems = items.filter(item => item.roles.includes(userRole));
-  const showCatalog = ['admin'].includes(userRole);
-  const showOrders = ['admin', 'store_manager'].includes(userRole);
-  const showConsignments = ['admin', 'store_manager'].includes(userRole);
+  console.log("User Roles:", userInfo?.roles);
+  const visibleItems = items.filter(item => item.roles.includes(userInfo?.roles[0]));
+  const showCatalog = ["ROLE_ADMIN", "ROLE_SUPPORT_AGENT"].includes(userInfo?.roles[0]);
+  const showOrders = ["ROLE_ADMIN", "ROLE_STORE_MANAGER", "ROLE_SUPPORT_AGENT"].includes(userInfo?.roles[0]);
+  const showConsignments = ["ROLE_ADMIN", "ROLE_WAREHOUSE_MANAGER", "ROLE_WAREHOUSE_STAFF"].includes(userInfo?.roles[0]);
 
   const handleCatalogClick = (e: React.MouseEvent) => {
     e.preventDefault();
@@ -222,7 +216,8 @@ export function AppSidebar() {
                   </SidebarMenuButton>
                   {isConsignmentsOpen && (
                     <SidebarMenuSub>
-                      {consignmentsSubItems.map((subItem) => {
+                      {consignmentsSubItems.filter(subItem => subItem.roles.includes(userInfo?.roles[0]))
+                      .map((subItem) => {
                         const isActive = location.pathname === subItem.url;
                         return (
                           <SidebarMenuSubItem key={subItem.title}>

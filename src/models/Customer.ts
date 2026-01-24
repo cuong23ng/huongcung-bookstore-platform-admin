@@ -1,4 +1,5 @@
 import { Order, OrderDetails } from './Order';
+import { PaginationInfo } from './PaginationInfo';
 
 export type LoyaltyTier = 'BRONZE' | 'SILVER' | 'GOLD' | 'PLATINUM';
 
@@ -15,12 +16,7 @@ export interface Customer {
 
 export interface PaginatedOrders {
   orders: Order[];
-  pagination: {
-    page: number;
-    size: number;
-    totalElements: number;
-    totalPages: number;
-  };
+  pagination: PaginationInfo;
 }
 
 

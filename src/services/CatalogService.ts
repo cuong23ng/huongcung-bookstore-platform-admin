@@ -32,9 +32,10 @@ export class CatalogService {
     q?: string;
     genres?: string[];
     languages?: string[];
-  }): Promise<Book[]> {
+    page?: number;
+    size?: number;
+  }): Promise<GetBookCatalogPageResponse> {
     try {
-      // Build query parameters
       const queryParams = new URLSearchParams();
       if (params?.q && params.q.trim()) {
         queryParams.append('q', params.q.trim());
@@ -45,64 +46,57 @@ export class CatalogService {
       if (params?.languages && params.languages.length > 0) {
         params.languages.forEach(lang => queryParams.append('languages', lang));
       }
+      if (params?.page !== undefined) {
+        queryParams.append('page', params.page.toString());
+      }
+      if (params?.size !== undefined) {
+        queryParams.append('size', params.size.toString());
+      }
       
       const queryString = queryParams.toString();
       const url = `/admin/catalog/books${queryString ? `?${queryString}` : ''}`;
       
-      // Backend returns: { data: { books: [...], pagination: {...} }, message?: string, errorCode?: string }
       const response = await this.apiFetcher.get<BaseResponse<GetBookCatalogPageResponse>>(url);
       
-      // Check for error code first
       if (response.data?.errorCode) {
         throw new Error(response.data.message || 'Failed to fetch books');
       }
       
-      // Backend returns data in format: { data: { books: [...], pagination: {...} } }
       if (response.data?.data) {
-        // Check if data is an object with 'books' property (paginated response)
         if (typeof response.data.data === 'object' && 'books' in response.data.data) {
-          return response.data.data.books || [];
-        }
-        // Otherwise, data might be directly the array (fallback for non-paginated)
-        if (Array.isArray(response.data.data)) {
-        return response.data.data;
+          return response.data.data;
         }
       }
       
-      throw new Error('Invalid response format from server');
+      return {
+        books: [],
+        pagination: {
+          currentPage: 1,
+          pageSize: params?.size || 20,
+          totalResults: 0,
+          totalPages: 0,
+          hasNext: false,
+          hasPrevious: false
+        },
+      };
     } catch (error) {
       throw this.handleError(error, 'Failed to fetch books');
     }
   }
 
-  public async createBook(data: CreateBookRequest): Promise<Book> {
+  public async createBook(data: CreateBookRequest): Promise<string> {
     try {
       const response = await this.apiFetcher.post<BaseResponse<Book>>('/admin/catalog/books/create', data);
-      if (response.data?.errorCode) {
-        throw new Error(response.data.message || 'Failed to create book');
-      }
-      // If no errorCode and data exists, return it
-      if (response.data?.data) {
-        return response.data.data;
-      }
-      throw new Error(response.data.message || 'Failed to create book');
+      return response.data.message || 'Failed to create book';
     } catch (error) {
       throw this.handleError(error, 'Failed to create book');
     }
   }
 
-  public async updateBook(id: number, data: UpdateBookRequest): Promise<Book> {
+  public async updateBook(id: number, data: UpdateBookRequest): Promise<string> {
     try {
       const response = await this.apiFetcher.put<BaseResponse<Book>>(`/admin/catalog/books/${id}`, data);
-      // Check for error code first
-      if (response.data?.errorCode) {
-        throw new Error(response.data.message || 'Failed to update book');
-      }
-      // If no errorCode and data exists, return it
-      if (response.data?.data) {
-        return response.data.data;
-      }
-      throw new Error(response.data.message || 'Failed to update book');
+      return response.data.message || 'Failed to update book';
     } catch (error) {
       throw this.handleError(error, 'Failed to update book');
     }
@@ -112,12 +106,10 @@ export class CatalogService {
     try {
       const response = await this.apiFetcher.get<BaseResponse<BookDetail>>(`/admin/catalog/books/${id}`);
       
-      // Check for error code first
       if (response.data?.errorCode) {
         throw new Error(response.data.message || 'Failed to fetch book');
       }
       
-      // Backend returns data in format: { data: BookDetailDTO }
       if (response.data?.data) {
         return response.data.data;
       }

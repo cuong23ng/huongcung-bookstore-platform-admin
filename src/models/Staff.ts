@@ -1,5 +1,7 @@
-export type StaffRole = 'ADMIN' | 'STORE_MANAGER' | 'SUPPORT_AGENT';
-export type City = 'Hanoi' | 'HCMC' | 'Da Nang';
+import type { PaginationInfo } from './PaginationInfo';
+import type { City } from '../enum/Common';
+
+export type StaffRole = 'ROLE_ADMIN' | 'ROLE_STORE_MANAGER' | 'ROLE_WAREHOUSE_MANAGER' | 'ROLE_WAREHOUSE_STAFF' | 'ROLE_SUPPORT_AGENT';
 
 export interface Staff {
   id: number;
@@ -32,15 +34,6 @@ export interface UpdateStaffRequest {
   phone?: string;
   role?: StaffRole;
   city?: City;
-}
-
-export interface PaginationInfo {
-  currentPage: number;
-  pageSize: number;
-  totalResults: number;
-  totalPages: number;
-  hasNext: boolean;
-  hasPrevious: boolean;
 }
 
 export interface GetStaffResponse {

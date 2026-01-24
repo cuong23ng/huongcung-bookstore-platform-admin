@@ -1,3 +1,5 @@
+import type { StaffRole } from "./Staff";
+
 export interface LoginRequest {
   username: string; // Backend uses 'username' field
   password: string;
@@ -11,7 +13,7 @@ export interface AuthResponse {
   email: string;
   firstName: string;
   lastName: string;
-  roles: string[];
+  roles: StaffRole[];
   // Note: userType and city are not returned by backend AuthResponse
   // They may be available in other endpoints if needed
 }
@@ -21,7 +23,7 @@ export interface AdminUserInfo {
   email: string;
   firstName: string;
   lastName: string;
-  roles: string[];
+  roles: StaffRole[];
   // Note: userType and city are not in AuthResponse
   // They may be available from other endpoints if needed
   userType?: string; // Optional, may not be available

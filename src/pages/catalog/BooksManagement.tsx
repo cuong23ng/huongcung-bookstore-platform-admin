@@ -16,7 +16,7 @@ import { BookDetailsDialog } from "../../components/BookDetailsDialog";
 import { BooksTable } from "../../components/catalog/BooksTable";
 import { BookFormDialog } from "../../components/catalog/BookFormDialog";
 import { useToast } from "../../hooks/use-toast";
-import { ArrowLeft, Search, X } from "lucide-react";
+import { ArrowLeft, Search, X, ChevronLeft, ChevronRight } from "lucide-react";
 import { CatalogService } from "../../services/CatalogService";
 import { getAuthData } from "../../services/AdminAuthService";
 import { Header } from "../../components/Header";
@@ -36,6 +36,10 @@ export default function BooksManagement() {
   const [searchQuery, setSearchQuery] = useState<string>('');
   const [selectedLanguage, setSelectedLanguage] = useState<string | undefined>(undefined);
   const [selectedGenres, setSelectedGenres] = useState<string[]>([]);
+  
+  // Pagination state
+  const [currentPage, setCurrentPage] = useState(1);
+  const [pageSize] = useState(20);
   
   // Deferred value for search to debounce API calls
   const deferredSearchQuery = useDeferredValue(searchQuery);
@@ -92,14 +96,24 @@ export default function BooksManagement() {
   }, [navigate, toast, userInfo, userRole]);
 
   // Books
-  const { data: books = [], isLoading: isLoadingBooks, error: booksError, refetch: refetchBooks } = useQuery({
-    queryKey: ['books', deferredSearchQuery, selectedLanguage, selectedGenres],
+  const { data: booksData, isLoading: isLoadingBooks, error: booksError, refetch: refetchBooks } = useQuery({
+    queryKey: ['books', deferredSearchQuery, selectedLanguage, selectedGenres, currentPage, pageSize],
     queryFn: () => CatalogService.getInstance().getAllBooks({
       q: deferredSearchQuery || undefined,
       languages: selectedLanguage ? [selectedLanguage] : undefined,
       genres: selectedGenres.length > 0 ? selectedGenres : undefined,
+      page: currentPage,
+      size: pageSize,
     }),
   });
+
+  const books = booksData?.books || [];
+  const pagination = booksData?.pagination;
+
+  // Reset pagination when filters change
+  useEffect(() => {
+    setCurrentPage(1);
+  }, [deferredSearchQuery, selectedLanguage, selectedGenres]);
 
   useEffect(() => {
     if (booksError && !isLoadingBooks) {
@@ -546,6 +560,36 @@ export default function BooksManagement() {
               onStatusUpdate={handleStatusUpdate}
               isUpdatingStatus={updateBookStatusMutation.isPending}
             />
+
+            {/* Pagination */}
+            {pagination && pagination.totalPages > 1 && (
+              <div className="flex items-center justify-between mt-4 pt-4 border-t">
+                <div className="text-sm text-muted-foreground">
+                  Trang {pagination.currentPage} / {pagination.totalPages} 
+                  {" "}(Tổng: {pagination.totalResults} sách)
+                </div>
+                <div className="flex gap-2">
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => setCurrentPage(p => p - 1)}
+                    disabled={!pagination.hasPrevious}
+                  >
+                    <ChevronLeft className="h-4 w-4 mr-1" />
+                    Trước
+                  </Button>
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => setCurrentPage(p => p + 1)}
+                    disabled={!pagination.hasNext}
+                  >
+                    Sau
+                    <ChevronRight className="h-4 w-4 ml-1" />
+                  </Button>
+                </div>
+              </div>
+            )}
 
             {/* Book Details Dialog */}
             <BookDetailsDialog

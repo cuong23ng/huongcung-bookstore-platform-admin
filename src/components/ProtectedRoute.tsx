@@ -1,15 +1,16 @@
 import { useEffect, useState } from "react";
 import { Navigate, useLocation } from "react-router-dom";
 import { AdminAuthService } from "../services/AdminAuthService";
+import type { StaffRole } from "../models/Staff";
 
 interface ProtectedRouteProps {
   children: React.ReactNode;
-  requiredRole?: string | string[];
+  requiredRole?: StaffRole | StaffRole[];
 }
 
 export default function ProtectedRoute({ children, requiredRole }: ProtectedRouteProps) {
   const [isAuthenticated, setIsAuthenticated] = useState<boolean | null>(null);
-  const [userRole, setUserRole] = useState<string | null>(null);
+  const [userRole, setUserRole] = useState<StaffRole>('ROLE_ADMIN');
   const location = useLocation();
 
   useEffect(() => {
@@ -20,13 +21,8 @@ export default function ProtectedRoute({ children, requiredRole }: ProtectedRout
     if (authenticated) {
       const userInfo = authService.getAuthData();
       if (userInfo) {
-        let role: string;
-        if (userInfo.roles && userInfo.roles.length > 0) {
-          // Get first role and normalize: remove ROLE_ prefix if present and convert to lowercase
-          role = userInfo.roles[0].toLowerCase().replace(/^role_/, '');
-        } else {
-          role = userInfo.userType.toLowerCase();
-        }
+        let role: StaffRole;
+        role = userInfo.roles[0];
         setUserRole(role);
       }
     }
@@ -41,22 +37,15 @@ export default function ProtectedRoute({ children, requiredRole }: ProtectedRout
     );
   }
 
-  // Redirect to login if not authenticated
   if (!isAuthenticated) {
     return <Navigate to="/admin/login" state={{ from: location }} replace />;
   }
 
-  // Check role-based access if requiredRole is specified
   if (requiredRole) {
     const requiredRoles = Array.isArray(requiredRole) ? requiredRole : [requiredRole];
-    // Normalize required roles: remove ROLE_ prefix if present and convert to lowercase
-    const normalizedRequiredRoles = requiredRoles.map(r => 
-      r.toLowerCase().replace(/^role_/, '')
-    );
     
     console.log(userRole);
-    if (!userRole || !normalizedRequiredRoles.includes(userRole)) {
-      // User doesn't have required role, redirect to dashboard
+    if (!userRole || !requiredRoles.includes(userRole)) {
       return <Navigate to="/admin/dashboard" replace />;
     }
   }

@@ -1,24 +1,26 @@
 import { City } from './Staff';
 
+export type StockStatus = 'LOW_STOCK' | 'OUT_OF_STOCK' | 'AVAILABLE';
+
 export interface StockLevel {
   id: number;
   bookId: number;
   bookTitle?: string;
   bookCode?: string;
   bookIsbn?: string;
-  sku?: string; // SKU from StockLevelDTO
-  city: City; // Keep for backward compatibility, but prefer warehouseCity
+  sku?: string;
+  city: City;
   warehouseId?: number;
   warehouseCode?: string;
   warehouseCity?: string;
   warehouseAddress?: string;
-  totalQuantity: number; // Maps to quantity (legacy)
-  quantity?: number; // Backend field name (total stock)
-  reservedQuantity: number; // Committed to orders (read-only)
-  availableQuantity: number; // Calculated: quantity - reservedQuantity
-  isLowStock?: boolean; // Calculated: quantity <= reorderLevel
-  isOutOfStock?: boolean; // Calculated: availableQuantity <= 0
-  status?: 'LOW_STOCK' | 'OUT_OF_STOCK' | 'AVAILABLE'; // StockStatus from backend
+  totalQuantity: number;
+  quantity?: number;
+  reservedQuantity: number;
+  availableQuantity: number;
+  isLowStock?: boolean;
+  isOutOfStock?: boolean;
+  status?: StockStatus;
   reorderLevel?: number;
   reorderQuantity?: number;
   lastRestocked?: string;
@@ -40,8 +42,8 @@ export interface PaginatedStockLevels {
 }
 
 export interface StockAdjustmentRequest {
-  newQuantity: number; // New total quantity (not a change/delta)
-  reason: string; // Required for audit logging (1-1000 characters)
+  newQuantity: number;
+  reason: string;
 }
 
 export interface StockAdjustment {

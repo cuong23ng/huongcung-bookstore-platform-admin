@@ -1,3 +1,9 @@
+import type { PaginationInfo } from './PaginationInfo';
+import type { BaseResponse } from './Api';
+
+export type BookStatus = 'PUBLISHED' | 'UNPUBLISHED';
+export type BookType = 'PHYSICAL' | 'EBOOK';
+
 export interface Book {
   id: number;
   title: string;
@@ -5,12 +11,12 @@ export interface Book {
   description?: string;
   coverImageUrl?: string;
   price: number;
-  bookType: 'PHYSICAL' | 'EBOOK';
+  bookType: BookType;
   hasPhysicalEdition: boolean;
   hasEbookEdition: boolean;
   language: string;
   publishedDate?: string;
-  status?: 'PUBLISHED' | 'UNPUBLISHED';
+  status?: BookStatus;
   authors?: Author[];
   translators?: Translator[];
   publisher?: Publisher;
@@ -214,7 +220,7 @@ export interface BookDetail {
   language: string;
   edition: number;
   pageCount: number;
-  status?: 'PUBLISHED' | 'UNPUBLISHED';
+  status?: BookStatus;
   authors?: Author[];
   translators?: Translator[];
   genres?: Genre[];
@@ -224,14 +230,6 @@ export interface BookDetail {
   hasEbookEdition?: boolean;
   physicalBookInfo?: PhysicalBookInformation;
   ebookInfo?: EbookInformation;
-}
-
-// Response types for API
-export interface PaginationInfo {
-  page: number;
-  size: number;
-  totalElements: number;
-  totalPages: number;
 }
 
 export interface GetBookCatalogPageResponse {
@@ -257,12 +255,6 @@ export interface GetPublisherPageResponse {
 export interface GetTranslatorPageResponse {
   translators: Translator[];
   pagination: PaginationInfo;
-}
-
-export interface BaseResponse<T = any> {
-  errorCode?: string;
-  message?: string;
-  data: T;
 }
 
 

@@ -14,7 +14,7 @@ import { useToast } from "../hooks/use-toast";
 import { ArrowLeft, Package, Loader2, Eye } from "lucide-react";
 import { OrderFulfillmentService } from "../services/OrderFulfillmentService";
 import { getAuthData } from "../services/AdminAuthService";
-import type { Order, OrderDetails } from "../models";
+import type { Order,  } from "../models";
 
 export default function OrderFulfillment() {
   const navigate = useNavigate();

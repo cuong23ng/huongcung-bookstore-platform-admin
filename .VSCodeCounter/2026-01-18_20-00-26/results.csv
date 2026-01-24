@@ -1,0 +1,107 @@
+"filename", "language", "JSON", "JSON with Comments", "TypeScript", "TypeScript JSX", "PostCSS", "XML", "Markdown", "JavaScript", "HTML", "comment", "blank", "total"
+"d:\git-repos\FinalProject\frontend\hc-bookstore-admin\ARCHITECTURE.md", "Markdown", 0, 0, 0, 0, 0, 0, 542, 0, 0, 0, 138, 680
+"d:\git-repos\FinalProject\frontend\hc-bookstore-admin\README.md", "Markdown", 0, 0, 0, 0, 0, 0, 61, 0, 0, 0, 14, 75
+"d:\git-repos\FinalProject\frontend\hc-bookstore-admin\TESTING_STORY_7.1.md", "Markdown", 0, 0, 0, 0, 0, 0, 98, 0, 0, 0, 58, 156
+"d:\git-repos\FinalProject\frontend\hc-bookstore-admin\eslint.config.js", "JavaScript", 0, 0, 0, 0, 0, 0, 0, 22, 0, 0, 2, 24
+"d:\git-repos\FinalProject\frontend\hc-bookstore-admin\index.html", "HTML", 0, 0, 0, 0, 0, 0, 0, 0, 13, 0, 1, 14
+"d:\git-repos\FinalProject\frontend\hc-bookstore-admin\package-lock.json", "JSON", 9700, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 9701
+"d:\git-repos\FinalProject\frontend\hc-bookstore-admin\package.json", "JSON", 97, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 98
+"d:\git-repos\FinalProject\frontend\hc-bookstore-admin\postcss.config.js", "JavaScript", 0, 0, 0, 0, 0, 0, 0, 6, 0, 0, 2, 8
+"d:\git-repos\FinalProject\frontend\hc-bookstore-admin\public\vite.svg", "XML", 0, 0, 0, 0, 0, 1, 0, 0, 0, 0, 0, 1
+"d:\git-repos\FinalProject\frontend\hc-bookstore-admin\src\App.css", "PostCSS", 0, 0, 0, 0, 37, 0, 0, 0, 0, 0, 6, 43
+"d:\git-repos\FinalProject\frontend\hc-bookstore-admin\src\App.tsx", "TypeScript JSX", 0, 0, 0, 153, 0, 0, 0, 0, 0, 9, 4, 166
+"d:\git-repos\FinalProject\frontend\hc-bookstore-admin\src\assets\react.svg", "XML", 0, 0, 0, 0, 0, 1, 0, 0, 0, 0, 0, 1
+"d:\git-repos\FinalProject\frontend\hc-bookstore-admin\src\components\AppSidebar.tsx", "TypeScript JSX", 0, 0, 0, 215, 0, 0, 0, 0, 0, 14, 19, 248
+"d:\git-repos\FinalProject\frontend\hc-bookstore-admin\src\components\BestSellers.tsx", "TypeScript JSX", 0, 0, 0, 90, 0, 0, 0, 0, 0, 0, 4, 94
+"d:\git-repos\FinalProject\frontend\hc-bookstore-admin\src\components\BookCard.module.css", "PostCSS", 0, 0, 0, 0, 30, 0, 0, 0, 0, 2, 1, 33
+"d:\git-repos\FinalProject\frontend\hc-bookstore-admin\src\components\BookCard.tsx", "TypeScript JSX", 0, 0, 0, 169, 0, 0, 0, 0, 0, 15, 23, 207
+"d:\git-repos\FinalProject\frontend\hc-bookstore-admin\src\components\BookDetailsDialog.tsx", "TypeScript JSX", 0, 0, 0, 984, 0, 0, 0, 0, 0, 35, 36, 1055
+"d:\git-repos\FinalProject\frontend\hc-bookstore-admin\src\components\CartItem.test.tsx", "TypeScript JSX", 0, 0, 0, 113, 0, 0, 0, 0, 0, 5, 25, 143
+"d:\git-repos\FinalProject\frontend\hc-bookstore-admin\src\components\CartItem.tsx", "TypeScript JSX", 0, 0, 0, 106, 0, 0, 0, 0, 0, 5, 12, 123
+"d:\git-repos\FinalProject\frontend\hc-bookstore-admin\src\components\Example.test.tsx", "TypeScript JSX", 0, 0, 0, 19, 0, 0, 0, 0, 0, 1, 6, 26
+"d:\git-repos\FinalProject\frontend\hc-bookstore-admin\src\components\Footer.tsx", "TypeScript JSX", 0, 0, 0, 96, 0, 0, 0, 0, 0, 5, 7, 108
+"d:\git-repos\FinalProject\frontend\hc-bookstore-admin\src\components\Header.tsx", "TypeScript JSX", 0, 0, 0, 110, 0, 0, 0, 0, 0, 4, 14, 128
+"d:\git-repos\FinalProject\frontend\hc-bookstore-admin\src\components\ImageViewerDialog.tsx", "TypeScript JSX", 0, 0, 0, 47, 0, 0, 0, 0, 0, 0, 4, 51
+"d:\git-repos\FinalProject\frontend\hc-bookstore-admin\src\components\ProtectedRoute.tsx", "TypeScript JSX", 0, 0, 0, 50, 0, 0, 0, 0, 0, 6, 11, 67
+"d:\git-repos\FinalProject\frontend\hc-bookstore-admin\src\components\SearchBar.tsx", "TypeScript JSX", 0, 0, 0, 183, 0, 0, 0, 0, 0, 3, 16, 202
+"d:\git-repos\FinalProject\frontend\hc-bookstore-admin\src\components\SearchFilters.tsx", "TypeScript JSX", 0, 0, 0, 342, 0, 0, 0, 0, 0, 5, 24, 371
+"d:\git-repos\FinalProject\frontend\hc-bookstore-admin\src\components\ThemeToggle.tsx", "TypeScript JSX", 0, 0, 0, 18, 0, 0, 0, 0, 0, 0, 3, 21
+"d:\git-repos\FinalProject\frontend\hc-bookstore-admin\src\components\catalog\AuthorFormDialog.tsx", "TypeScript JSX", 0, 0, 0, 127, 0, 0, 0, 0, 0, 0, 3, 130
+"d:\git-repos\FinalProject\frontend\hc-bookstore-admin\src\components\catalog\AuthorsTable.tsx", "TypeScript JSX", 0, 0, 0, 63, 0, 0, 0, 0, 0, 0, 6, 69
+"d:\git-repos\FinalProject\frontend\hc-bookstore-admin\src\components\catalog\BookFormDialog.tsx", "TypeScript JSX", 0, 0, 0, 444, 0, 0, 0, 0, 0, 10, 21, 475
+"d:\git-repos\FinalProject\frontend\hc-bookstore-admin\src\components\catalog\BooksTable.tsx", "TypeScript JSX", 0, 0, 0, 127, 0, 0, 0, 0, 0, 7, 6, 140
+"d:\git-repos\FinalProject\frontend\hc-bookstore-admin\src\components\catalog\GenreFormDialog.tsx", "TypeScript JSX", 0, 0, 0, 73, 0, 0, 0, 0, 0, 0, 3, 76
+"d:\git-repos\FinalProject\frontend\hc-bookstore-admin\src\components\catalog\GenresTable.tsx", "TypeScript JSX", 0, 0, 0, 63, 0, 0, 0, 0, 0, 0, 6, 69
+"d:\git-repos\FinalProject\frontend\hc-bookstore-admin\src\components\dashboard\OrderStatusChart.tsx", "TypeScript JSX", 0, 0, 0, 88, 0, 0, 0, 0, 0, 1, 8, 97
+"d:\git-repos\FinalProject\frontend\hc-bookstore-admin\src\components\dashboard\OrderTrendChart.tsx", "TypeScript JSX", 0, 0, 0, 73, 0, 0, 0, 0, 0, 1, 6, 80
+"d:\git-repos\FinalProject\frontend\hc-bookstore-admin\src\components\dashboard\RevenueChart.tsx", "TypeScript JSX", 0, 0, 0, 85, 0, 0, 0, 0, 0, 1, 7, 93
+"d:\git-repos\FinalProject\frontend\hc-bookstore-admin\src\components\dashboard\TopSellingBooksChart.tsx", "TypeScript JSX", 0, 0, 0, 65, 0, 0, 0, 0, 0, 1, 6, 72
+"d:\git-repos\FinalProject\frontend\hc-bookstore-admin\src\components\ui\accordion.tsx", "TypeScript JSX", 0, 0, 0, 45, 0, 0, 0, 0, 0, 0, 8, 53
+"d:\git-repos\FinalProject\frontend\hc-bookstore-admin\src\components\ui\badge.tsx", "TypeScript JSX", 0, 0, 0, 30, 0, 0, 0, 0, 0, 0, 5, 35
+"d:\git-repos\FinalProject\frontend\hc-bookstore-admin\src\components\ui\button.tsx", "TypeScript JSX", 0, 0, 0, 43, 0, 0, 0, 0, 0, 0, 6, 49
+"d:\git-repos\FinalProject\frontend\hc-bookstore-admin\src\components\ui\card.tsx", "TypeScript JSX", 0, 0, 0, 35, 0, 0, 0, 0, 0, 0, 9, 44
+"d:\git-repos\FinalProject\frontend\hc-bookstore-admin\src\components\ui\checkbox.tsx", "TypeScript JSX", 0, 0, 0, 25, 0, 0, 0, 0, 0, 0, 12, 37
+"d:\git-repos\FinalProject\frontend\hc-bookstore-admin\src\components\ui\dialog.tsx", "TypeScript JSX", 0, 0, 0, 83, 0, 0, 0, 0, 0, 0, 13, 96
+"d:\git-repos\FinalProject\frontend\hc-bookstore-admin\src\components\ui\dropdown-menu.tsx", "TypeScript JSX", 0, 0, 0, 181, 0, 0, 0, 0, 0, 0, 18, 199
+"d:\git-repos\FinalProject\frontend\hc-bookstore-admin\src\components\ui\input.tsx", "TypeScript JSX", 0, 0, 0, 19, 0, 0, 0, 0, 0, 0, 4, 23
+"d:\git-repos\FinalProject\frontend\hc-bookstore-admin\src\components\ui\label.tsx", "TypeScript JSX", 0, 0, 0, 13, 0, 0, 0, 0, 0, 0, 5, 18
+"d:\git-repos\FinalProject\frontend\hc-bookstore-admin\src\components\ui\radio-group.tsx", "TypeScript JSX", 0, 0, 0, 37, 0, 0, 0, 0, 0, 0, 13, 50
+"d:\git-repos\FinalProject\frontend\hc-bookstore-admin\src\components\ui\select.tsx", "TypeScript JSX", 0, 0, 0, 145, 0, 0, 0, 0, 0, 0, 22, 167
+"d:\git-repos\FinalProject\frontend\hc-bookstore-admin\src\components\ui\separator.tsx", "TypeScript JSX", 0, 0, 0, 17, 0, 0, 0, 0, 0, 0, 4, 21
+"d:\git-repos\FinalProject\frontend\hc-bookstore-admin\src\components\ui\sheet.tsx", "TypeScript JSX", 0, 0, 0, 93, 0, 0, 0, 0, 0, 0, 15, 108
+"d:\git-repos\FinalProject\frontend\hc-bookstore-admin\src\components\ui\sidebar.tsx", "TypeScript JSX", 0, 0, 0, 572, 0, 0, 0, 0, 0, 12, 54, 638
+"d:\git-repos\FinalProject\frontend\hc-bookstore-admin\src\components\ui\skeleton.tsx", "TypeScript JSX", 0, 0, 0, 5, 0, 0, 0, 0, 0, 0, 3, 8
+"d:\git-repos\FinalProject\frontend\hc-bookstore-admin\src\components\ui\sonner.tsx", "TypeScript JSX", 0, 0, 0, 23, 0, 0, 0, 0, 0, 0, 5, 28
+"d:\git-repos\FinalProject\frontend\hc-bookstore-admin\src\components\ui\table.tsx", "TypeScript JSX", 0, 0, 0, 62, 0, 0, 0, 0, 0, 0, 11, 73
+"d:\git-repos\FinalProject\frontend\hc-bookstore-admin\src\components\ui\tabs.tsx", "TypeScript JSX", 0, 0, 0, 47, 0, 0, 0, 0, 0, 0, 7, 54
+"d:\git-repos\FinalProject\frontend\hc-bookstore-admin\src\components\ui\toast.tsx", "TypeScript JSX", 0, 0, 0, 99, 0, 0, 0, 0, 0, 0, 13, 112
+"d:\git-repos\FinalProject\frontend\hc-bookstore-admin\src\components\ui\toaster.tsx", "TypeScript JSX", 0, 0, 0, 22, 0, 0, 0, 0, 0, 0, 3, 25
+"d:\git-repos\FinalProject\frontend\hc-bookstore-admin\src\components\ui\tooltip.tsx", "TypeScript JSX", 0, 0, 0, 22, 0, 0, 0, 0, 0, 0, 7, 29
+"d:\git-repos\FinalProject\frontend\hc-bookstore-admin\src\hooks\use-mobile.tsx", "TypeScript JSX", 0, 0, 0, 15, 0, 0, 0, 0, 0, 0, 5, 20
+"d:\git-repos\FinalProject\frontend\hc-bookstore-admin\src\hooks\use-toast.ts", "TypeScript", 0, 0, 154, 0, 0, 0, 0, 0, 0, 2, 31, 187
+"d:\git-repos\FinalProject\frontend\hc-bookstore-admin\src\index.css", "PostCSS", 0, 0, 0, 0, 76, 0, 0, 0, 0, 3, 26, 105
+"d:\git-repos\FinalProject\frontend\hc-bookstore-admin\src\integrations\ApiClient.test.ts", "TypeScript", 0, 0, 115, 0, 0, 0, 0, 0, 0, 5, 38, 158
+"d:\git-repos\FinalProject\frontend\hc-bookstore-admin\src\integrations\ApiClient.ts", "TypeScript", 0, 0, 70, 0, 0, 0, 0, 0, 0, 8, 38, 116
+"d:\git-repos\FinalProject\frontend\hc-bookstore-admin\src\lib\utils.ts", "TypeScript", 0, 0, 5, 0, 0, 0, 0, 0, 0, 0, 2, 7
+"d:\git-repos\FinalProject\frontend\hc-bookstore-admin\src\main.tsx", "TypeScript JSX", 0, 0, 0, 9, 0, 0, 0, 0, 0, 0, 2, 11
+"d:\git-repos\FinalProject\frontend\hc-bookstore-admin\src\models\AdminAuth.ts", "TypeScript", 0, 0, 34, 0, 0, 0, 0, 0, 0, 4, 28, 66
+"d:\git-repos\FinalProject\frontend\hc-bookstore-admin\src\models\Catalog.ts", "TypeScript", 0, 0, 233, 0, 0, 0, 0, 0, 0, 5, 50, 288
+"d:\git-repos\FinalProject\frontend\hc-bookstore-admin\src\models\Customer.ts", "TypeScript", 0, 0, 21, 0, 0, 0, 0, 0, 0, 0, 27, 48
+"d:\git-repos\FinalProject\frontend\hc-bookstore-admin\src\models\Inventory.ts", "TypeScript", 0, 0, 70, 0, 0, 0, 0, 0, 0, 1, 31, 102
+"d:\git-repos\FinalProject\frontend\hc-bookstore-admin\src\models\Order.ts", "TypeScript", 0, 0, 184, 0, 0, 0, 0, 0, 0, 3, 40, 227
+"d:\git-repos\FinalProject\frontend\hc-bookstore-admin\src\models\Staff.ts", "TypeScript", 0, 0, 51, 0, 0, 0, 0, 0, 0, 0, 30, 81
+"d:\git-repos\FinalProject\frontend\hc-bookstore-admin\src\models\index.ts", "TypeScript", 0, 0, 6, 0, 0, 0, 0, 0, 0, 0, 2, 8
+"d:\git-repos\FinalProject\frontend\hc-bookstore-admin\src\pages\AdminDashboard.tsx", "TypeScript JSX", 0, 0, 0, 181, 0, 0, 0, 0, 0, 24, 22, 227
+"d:\git-repos\FinalProject\frontend\hc-bookstore-admin\src\pages\AdminLogin.tsx", "TypeScript JSX", 0, 0, 0, 99, 0, 0, 0, 0, 0, 2, 9, 110
+"d:\git-repos\FinalProject\frontend\hc-bookstore-admin\src\pages\CatalogManagement.tsx", "TypeScript JSX", 0, 0, 0, 581, 0, 0, 0, 0, 0, 32, 66, 679
+"d:\git-repos\FinalProject\frontend\hc-bookstore-admin\src\pages\ConsignmentManagement.tsx", "TypeScript JSX", 0, 0, 0, 959, 0, 0, 0, 0, 0, 30, 43, 1032
+"d:\git-repos\FinalProject\frontend\hc-bookstore-admin\src\pages\CustomerSupport.tsx", "TypeScript JSX", 0, 0, 0, 431, 0, 0, 0, 0, 0, 11, 23, 465
+"d:\git-repos\FinalProject\frontend\hc-bookstore-admin\src\pages\InventoryManagement.tsx", "TypeScript JSX", 0, 0, 0, 887, 0, 0, 0, 0, 0, 35, 43, 965
+"d:\git-repos\FinalProject\frontend\hc-bookstore-admin\src\pages\NotFound.tsx", "TypeScript JSX", 0, 0, 0, 20, 0, 0, 0, 0, 0, 0, 5, 25
+"d:\git-repos\FinalProject\frontend\hc-bookstore-admin\src\pages\OrderFulfillment.tsx", "TypeScript JSX", 0, 0, 0, 730, 0, 0, 0, 0, 0, 23, 33, 786
+"d:\git-repos\FinalProject\frontend\hc-bookstore-admin\src\pages\StaffManagement.tsx", "TypeScript JSX", 0, 0, 0, 610, 0, 0, 0, 0, 0, 51, 41, 702
+"d:\git-repos\FinalProject\frontend\hc-bookstore-admin\src\pages\catalog\AuthorsManagement.tsx", "TypeScript JSX", 0, 0, 0, 197, 0, 0, 0, 0, 0, 18, 24, 239
+"d:\git-repos\FinalProject\frontend\hc-bookstore-admin\src\pages\catalog\BooksManagement.tsx", "TypeScript JSX", 0, 0, 0, 467, 0, 0, 0, 0, 0, 46, 49, 562
+"d:\git-repos\FinalProject\frontend\hc-bookstore-admin\src\pages\catalog\GenresManagement.tsx", "TypeScript JSX", 0, 0, 0, 130, 0, 0, 0, 0, 0, 15, 17, 162
+"d:\git-repos\FinalProject\frontend\hc-bookstore-admin\src\pages\consignments\AllConsignments.tsx", "TypeScript JSX", 0, 0, 0, 697, 0, 0, 0, 0, 0, 33, 35, 765
+"d:\git-repos\FinalProject\frontend\hc-bookstore-admin\src\pages\consignments\CreatedConsignments.tsx", "TypeScript JSX", 0, 0, 0, 561, 0, 0, 0, 0, 0, 29, 25, 615
+"d:\git-repos\FinalProject\frontend\hc-bookstore-admin\src\pages\orders\AllOrders.tsx", "TypeScript JSX", 0, 0, 0, 554, 0, 0, 0, 0, 0, 29, 25, 608
+"d:\git-repos\FinalProject\frontend\hc-bookstore-admin\src\pages\orders\FulfillmentQueue.tsx", "TypeScript JSX", 0, 0, 0, 507, 0, 0, 0, 0, 0, 26, 24, 557
+"d:\git-repos\FinalProject\frontend\hc-bookstore-admin\src\services\AdminAuthService.test.ts", "TypeScript", 0, 0, 195, 0, 0, 0, 0, 0, 0, 1, 39, 235
+"d:\git-repos\FinalProject\frontend\hc-bookstore-admin\src\services\AdminAuthService.ts", "TypeScript", 0, 0, 101, 0, 0, 0, 0, 0, 0, 5, 21, 127
+"d:\git-repos\FinalProject\frontend\hc-bookstore-admin\src\services\CatalogService.ts", "TypeScript", 0, 0, 442, 0, 0, 0, 0, 0, 0, 60, 58, 560
+"d:\git-repos\FinalProject\frontend\hc-bookstore-admin\src\services\CustomerSupportService.ts", "TypeScript", 0, 0, 109, 0, 0, 0, 0, 0, 0, 0, 36, 145
+"d:\git-repos\FinalProject\frontend\hc-bookstore-admin\src\services\DashboardService.ts", "TypeScript", 0, 0, 82, 0, 0, 0, 0, 0, 0, 8, 17, 107
+"d:\git-repos\FinalProject\frontend\hc-bookstore-admin\src\services\InventoryService.ts", "TypeScript", 0, 0, 349, 0, 0, 0, 0, 0, 0, 73, 73, 495
+"d:\git-repos\FinalProject\frontend\hc-bookstore-admin\src\services\OrderFulfillmentService.ts", "TypeScript", 0, 0, 374, 0, 0, 0, 0, 0, 0, 73, 75, 522
+"d:\git-repos\FinalProject\frontend\hc-bookstore-admin\src\services\ReviewService.ts", "TypeScript", 0, 0, 208, 0, 0, 0, 0, 0, 0, 42, 32, 282
+"d:\git-repos\FinalProject\frontend\hc-bookstore-admin\src\services\StaffService.test.ts", "TypeScript", 0, 0, 365, 0, 0, 0, 0, 0, 0, 4, 97, 466
+"d:\git-repos\FinalProject\frontend\hc-bookstore-admin\src\services\StaffService.ts", "TypeScript", 0, 0, 257, 0, 0, 0, 0, 0, 0, 20, 40, 317
+"d:\git-repos\FinalProject\frontend\hc-bookstore-admin\src\test\setup.ts", "TypeScript", 0, 0, 6, 0, 0, 0, 0, 0, 0, 1, 25, 32
+"d:\git-repos\FinalProject\frontend\hc-bookstore-admin\tailwind.config.ts", "TypeScript", 0, 0, 90, 0, 0, 0, 0, 0, 0, 0, 2, 92
+"d:\git-repos\FinalProject\frontend\hc-bookstore-admin\tsconfig.app.json", "JSON", 24, 0, 0, 0, 0, 0, 0, 0, 0, 2, 3, 29
+"d:\git-repos\FinalProject\frontend\hc-bookstore-admin\tsconfig.json", "JSON with Comments", 0, 7, 0, 0, 0, 0, 0, 0, 0, 0, 1, 8
+"d:\git-repos\FinalProject\frontend\hc-bookstore-admin\tsconfig.node.json", "JSON", 22, 0, 0, 0, 0, 0, 0, 0, 0, 2, 3, 27
+"d:\git-repos\FinalProject\frontend\hc-bookstore-admin\vite.config.ts", "TypeScript", 0, 0, 25, 0, 0, 0, 0, 0, 0, 1, 2, 28
+"d:\git-repos\FinalProject\frontend\hc-bookstore-admin\vitest.config.ts", "TypeScript", 0, 0, 16, 0, 0, 0, 0, 0, 0, 0, 25, 41
+"Total", "-", 9843, 7, 3562, 13156, 143, 2, 701, 28, 13, 869, 2124, 30448
