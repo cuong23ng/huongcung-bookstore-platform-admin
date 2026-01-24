@@ -7,7 +7,7 @@ export interface StockLevel {
   bookId: number;
   bookTitle?: string;
   bookCode?: string;
-  bookIsbn?: string;
+  isbn?: string;
   sku?: string;
   city: City;
   warehouseId?: number;

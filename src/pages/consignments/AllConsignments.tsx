@@ -237,41 +237,18 @@ export default function AllConsignments() {
     createShippingOrderMutation.mutate(consignmentId);
   };
 
-  const getStatusLabel = (status: string) => {
-    switch (status) {
-      case "CREATED":
-        return "Đã tạo";
-      case "PENDING":
-        return "Chờ xử lý";
-      case "PICKED_UP":
-        return "Đã lấy hàng";
-      case "IN_TRANSIT":
-        return "Đang vận chuyển";
-      case "OUT_FOR_DELIVERY":
-        return "Đang giao hàng";
-      case "DELIVERED":
-        return "Đã giao hàng";
-      case "FAILED_DELIVERY":
-        return "Giao hàng thất bại";
-      case "RETURNED":
-        return "Đã trả hàng";
-      default:
-        return status;
-    }
-  };
-
-  const getStatusBadgeVariant = (status: string): "default" | "secondary" | "destructive" | "outline" => {
+  const getStatusBadgeVariant = (status: string) => {
     switch (status) {
       case "CREATED":
         return "outline";
       case "PENDING":
-        return "secondary";
+        return "yellow";
       case "PICKED_UP":
       case "IN_TRANSIT":
       case "OUT_FOR_DELIVERY":
-        return "default";
+        return "violet";
       case "DELIVERED":
-        return "default";
+        return "green";
       case "FAILED_DELIVERY":
       case "RETURNED":
         return "destructive";
@@ -283,12 +260,10 @@ export default function AllConsignments() {
   const getCityLabel = (city: string | City) => {
     switch (city) {
       case "HANOI":
-      case "Hanoi":
         return "Hà Nội";
       case "HCMC":
         return "TP. Hồ Chí Minh";
       case "DANANG":
-      case "Da Nang":
         return "Đà Nẵng";
       default:
         return city;
@@ -481,7 +456,7 @@ export default function AllConsignments() {
                         <TableCell>{getCityLabel(consignment.warehouseCity)}</TableCell>
                         <TableCell>
                           <Badge variant={getStatusBadgeVariant(consignment.status)}>
-                            {getStatusLabel(consignment.status)}
+                            {consignment.status}
                           </Badge>
                         </TableCell>
                         <TableCell>{consignment.trackingNumber || "-"}</TableCell>
@@ -644,7 +619,7 @@ export default function AllConsignments() {
                     <Label className="text-sm font-medium text-muted-foreground">Trạng thái</Label>
                     <div>
                       <Badge variant={getStatusBadgeVariant(saleOrderDetails.status)}>
-                        {getStatusLabel(saleOrderDetails.status)}
+                        {saleOrderDetails.status}
                       </Badge>
                     </div>
                   </div>

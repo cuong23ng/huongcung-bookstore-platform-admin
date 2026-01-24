@@ -118,45 +118,24 @@ export default function AllOrders() {
     createConsignmentsMutation.mutate(orderId);
   };
 
-  const getStatusLabel = (status: string) => {
-    switch (status) {
-      case "PENDING":
-        return "Chờ xử lý";
-      case "WAITING_PAYMENT":
-        return "Chờ thanh toán";
-      case "PICKED_UP":
-        return "Đã lấy hàng";
-      case "IN_TRANSIT":
-        return "Đang vận chuyển";
-      case "OUT_FOR_DELIVERY":
-        return "Đang giao hàng";
-      case "DELIVERED":
-        return "Đã giao hàng";
-      case "FAILED_DELIVERY":
-        return "Giao hàng thất bại";
-      case "RETURNED":
-        return "Đã trả hàng";
-      case "CANCELLED":
-        return "Đã hủy";
-      default:
-        return status;
-    }
-  };
-
-  const getStatusBadgeVariant = (status: string): "default" | "secondary" | "destructive" | "outline" => {
+  const getStatusBadgeVariant = (status: string) => {
     switch (status) {
       case "PENDING":
         return "secondary";
-      case "PICKED_UP":
-      case "IN_TRANSIT":
-      case "OUT_FOR_DELIVERY":
-        return "default";
+      case "CONFIRMED":
+        return "cyan";
+      case "PROCESSING":
+        return "outline";
+      case "SHIPPED":
+        return "blue";
+      case "WAITING_PAYMENT":
+        return "yellow";
       case "DELIVERED":
         return "default";
-      case "FAILED_DELIVERY":
-      case "RETURNED":
+      case "COMPLETED":
+        return "green";
       case "CANCELLED":
-        return "destructive";
+        return "violet";
       default:
         return "outline";
     }
@@ -242,17 +221,17 @@ export default function AllOrders() {
                   }}
                 >
                   <SelectTrigger id="order-status-filter">
-                    <SelectValue placeholder="Tất cả trạng thái" />
+                    <SelectValue placeholder="ALL" />
                   </SelectTrigger>
                   <SelectContent>
-                    <SelectItem value="all">Tất cả trạng thái</SelectItem>
-                    <SelectItem value="PENDING">Chờ xử lý</SelectItem>
-                    <SelectItem value="WAITING_PAYMENT">Chờ thanh toán</SelectItem>
-                    <SelectItem value="CONFIRMED">Đã xác nhận</SelectItem>
-                    <SelectItem value="PROCESSING">Đang xử lý</SelectItem>
-                    <SelectItem value="SHIPPED">Đã gửi hàng</SelectItem>
-                    <SelectItem value="DELIVERED">Đã giao hàng</SelectItem>
-                    <SelectItem value="CANCELLED">Đã hủy</SelectItem>
+                    <SelectItem value="all">ALL</SelectItem>
+                    <SelectItem value="PENDING">PENDING</SelectItem>
+                    <SelectItem value="WAITING_PAYMENT">WAITING_PAYMENT</SelectItem>
+                    <SelectItem value="CONFIRMED">CONFIRMED</SelectItem>
+                    <SelectItem value="PROCESSING">PROCESSING</SelectItem>
+                    <SelectItem value="SHIPPED">SHIPPED</SelectItem>
+                    <SelectItem value="DELIVERED">DELIVERED</SelectItem>
+                    <SelectItem value="CANCELLED">CANCELLED</SelectItem>
                   </SelectContent>
                 </Select>
               </div>
@@ -311,7 +290,7 @@ export default function AllOrders() {
                         </TableCell>
                         <TableCell>
                           <Badge variant={getStatusBadgeVariant(order.status)}>
-                            {getStatusLabel(order.status)}
+                            {order.status}
                           </Badge>
                         </TableCell>
                         <TableCell>{order.totalAmount?.toLocaleString('vi-VN') || 0} VNĐ</TableCell>
@@ -405,7 +384,7 @@ export default function AllOrders() {
                     <Label className="text-sm font-medium text-muted-foreground">Trạng thái</Label>
                     <div className="mt-1">
                       <Badge variant={getStatusBadgeVariant(orderDetails.status)}>
-                        {getStatusLabel(orderDetails.status)}
+                        {orderDetails.status}
                       </Badge>
                     </div>
                   </div>
@@ -416,11 +395,7 @@ export default function AllOrders() {
                   <div>
                     <Label className="text-sm font-medium text-muted-foreground">Thanh toán</Label>
                     <div className="mt-1">
-                      {orderDetails.paymentStatus ? (
-                        <Badge variant={orderDetails.paymentStatus === 'PAID' ? 'default' : 'secondary'}>
-                          {orderDetails.paymentStatus === 'PAID' ? 'Đã thanh toán' : orderDetails.paymentStatus === 'PENDING' ? 'Chờ thanh toán' : 'Đã hoàn tiền'}
-                        </Badge>
-                      ) : '-'}
+                      {orderDetails.paymentMethod}
                     </div>
                   </div>
                 </div>
@@ -482,12 +457,12 @@ export default function AllOrders() {
                               <CardTitle className="text-lg">Lô hàng: {consignment.code}</CardTitle>
                               <CardDescription>
                                 Kho: {getCityLabel(consignment.warehouseCity)} | 
-                                Trạng thái: {getStatusLabel(consignment.status)}
+                                Trạng thái: {consignment.status}
                                 {consignment.trackingNumber && ` | Mã vận đơn: ${consignment.trackingNumber}`}
                               </CardDescription>
                             </div>
                             <Badge variant={getStatusBadgeVariant(consignment.status)}>
-                              {getStatusLabel(consignment.status)}
+                              {consignment.status}
                             </Badge>
                           </div>
                         </CardHeader>

@@ -13,7 +13,8 @@ import { useToast } from "../hooks/use-toast";
 import { ArrowLeft, Eye, ChevronLeft, ChevronRight, AlertTriangle, Edit, History, X } from "lucide-react";
 import { InventoryService } from "../services/InventoryService";
 import { getAuthData } from "../services/AdminAuthService";
-import type { StockLevel, City, StockAdjustmentRequest, StockAdjustment } from "../models";
+import type { StockLevel, StockAdjustmentRequest, StockAdjustment } from "../models";
+import type { City } from "../enum/Common";
 import { Badge } from "../components/ui/badge";
 import { Header } from "../components/Header";
 
@@ -39,28 +40,17 @@ export default function InventoryManagement() {
 
   const userInfo = getAuthData();
   // Normalize role: remove ROLE_ prefix if present and convert to lowercase
-  let userRole: 'admin' | 'store_manager' = 'store_manager';
-  if (userInfo?.roles && userInfo.roles.length > 0) {
-    const role = userInfo.roles[0].toLowerCase().replace(/^role_/, '');
-    if (role === 'admin' || role === 'store_manager') {
-      userRole = role as 'admin' | 'store_manager';
-    }
-  } else if (userInfo?.userType) {
-    const role = userInfo.userType.toLowerCase();
-    if (role === 'admin' || role === 'store_manager') {
-      userRole = role as 'admin' | 'store_manager';
-    }
-  }
+  const userRole = userInfo?.roles[0];
   const userCity = userInfo?.city as City | undefined;
 
-  // Check access
   useEffect(() => {
     if (!userInfo) {
       navigate("/admin/login");
       return;
     }
 
-    if (userRole !== 'admin' && userRole !== 'store_manager') {
+    if (userRole !== 'ROLE_ADMIN' && userRole !== 'ROLE_STORE_MANAGER' && userRole !== 'ROLE_WAREHOUSE_MANAGER' && userRole !== 'ROLE_WAREHOUSE_STAFF') {
+      console.log("inventoryManagement:", userRole);
       toast({
         title: "Không có quyền truy cập",
         description: "Chỉ quản trị viên và quản lý cửa hàng mới có thể truy cập trang này",
@@ -70,8 +60,7 @@ export default function InventoryManagement() {
     }
   }, [navigate, toast, userInfo, userRole]);
 
-  // Determine city filter: Store Managers see only their city, Admins can filter
-  const effectiveCity = userRole === 'store_manager' ? userCity : (cityFilter === 'all' ? undefined : cityFilter);
+  const effectiveCity = userRole === 'ROLE_STORE_MANAGER' ? userCity : (cityFilter === 'all' ? undefined : cityFilter);
 
   // Reset to first page when filters change
   useEffect(() => {
@@ -218,12 +207,10 @@ export default function InventoryManagement() {
 
   const getCityLabel = (city: string) => {
     switch (city) {
-      case "Hanoi":
       case "HANOI":
         return "Hà Nội";
       case "HCMC":
         return "TP. Hồ Chí Minh";
-      case "Da Nang":
       case "DANANG":
         return "Đà Nẵng";
       default:
@@ -244,14 +231,14 @@ export default function InventoryManagement() {
     }
   };
 
-  const getStatusBadgeVariant = (status?: string): "default" | "secondary" | "destructive" | "outline" => {
+  const getStatusBadgeVariant = (status?: string) => {
     switch (status) {
       case "LOW_STOCK":
-        return "secondary";
+        return "yellow";
       case "OUT_OF_STOCK":
-        return "destructive";
+        return "red";
       case "AVAILABLE":
-        return "default";
+        return "green";
       default:
         return "outline";
     }
@@ -323,7 +310,7 @@ export default function InventoryManagement() {
               <div>
                 <CardTitle className="mb-4">Mức tồn kho</CardTitle>
                 <CardDescription className="mb-4">
-                  {userRole === 'store_manager' 
+                  {userRole === 'ROLE_STORE_MANAGER' 
                     ? `Tồn kho tại ${getCityLabel(userCity || '')}` 
                     : 'Quản lý tồn kho theo thành phố'}
                 </CardDescription>
@@ -349,7 +336,7 @@ export default function InventoryManagement() {
                 </Select>
               </div>
               <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
-                {userRole === 'admin' && (
+                {userRole === 'ROLE_ADMIN' && (
                   <div>
                     <Label htmlFor="city-filter">Thành phố</Label>
                     <Select value={cityFilter} onValueChange={(value) => setCityFilter(value as City | "all")}>
@@ -405,7 +392,7 @@ export default function InventoryManagement() {
                     onClick={() => {
                       setSearchQuery("");
                       setSearchType('TITLE');
-                      setCityFilter(userRole === 'store_manager' ? (userCity as City | "all") : "all");
+                      setCityFilter(userRole === 'ROLE_STORE_MANAGER' ? (userCity as City | "all") : "all");
                       setWarehouseCodeFilter(undefined);
                       setStatusFilter("all");
                     }}
@@ -455,17 +442,10 @@ export default function InventoryManagement() {
                   </TableHeader>
                   <TableBody>
                     {stockLevels.map((stock) => {
-                      const status = stock.status;
-                      const rowClassName = status === 'LOW_STOCK' 
-                        ? "bg-yellow-50 dark:bg-yellow-950/20" 
-                        : status === 'OUT_OF_STOCK' 
-                        ? "bg-red-50 dark:bg-red-950/20" 
-                        : "";
                       
                       return (
                         <TableRow 
                           key={stock.id}
-                          className={rowClassName}
                         >
                           <TableCell>{formatDate(stock.createdAt)}</TableCell>
                           <TableCell className="font-medium">
@@ -481,8 +461,8 @@ export default function InventoryManagement() {
                               : "-"}
                           </TableCell>
                           <TableCell>
-                            <Badge variant={getStatusBadgeVariant(status)}>
-                              {getStatusLabel(status)}
+                            <Badge variant={getStatusBadgeVariant(stock.status)}>
+                              {getStatusLabel(stock.status)}
                             </Badge>
                           </TableCell>
                           <TableCell>{formatDate(stock.lastRestocked)}</TableCell>

@@ -192,18 +192,18 @@ export default function CreatedConsignments() {
     }
   };
 
-  const getStatusBadgeVariant = (status: string): "default" | "secondary" | "destructive" | "outline" => {
+  const getStatusBadgeVariant = (status: string) => {
     switch (status) {
       case "CREATED":
         return "outline";
       case "PENDING":
-        return "secondary";
+        return "yellow";
       case "PICKED_UP":
       case "IN_TRANSIT":
       case "OUT_FOR_DELIVERY":
-        return "default";
+        return "violet";
       case "DELIVERED":
-        return "default";
+        return "green";
       case "FAILED_DELIVERY":
       case "RETURNED":
         return "destructive";
@@ -390,7 +390,7 @@ export default function CreatedConsignments() {
                         <TableCell>{getCityLabel(consignment.warehouseCity)}</TableCell>
                         <TableCell>
                           <Badge variant={getStatusBadgeVariant(consignment.status)}>
-                            {getStatusLabel(consignment.status)}
+                            {consignment.status}
                           </Badge>
                         </TableCell>
                         <TableCell>{consignment.trackingNumber || "-"}</TableCell>
@@ -494,7 +494,7 @@ export default function CreatedConsignments() {
                     <Label className="text-sm font-medium text-muted-foreground">Trạng thái</Label>
                     <div>
                       <Badge variant={getStatusBadgeVariant(saleOrderDetails.status)}>
-                        {getStatusLabel(saleOrderDetails.status)}
+                        {saleOrderDetails.status}
                       </Badge>
                     </div>
                   </div>

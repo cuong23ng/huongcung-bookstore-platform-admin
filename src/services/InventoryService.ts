@@ -4,14 +4,15 @@ import type {
   AdjustStockRequest, 
   StockAdjustmentRequest,
   PaginatedStockAdjustments,
-  ApiResponse, 
-  City, 
+  ApiResponse,
   PaginatedStockLevels, 
   AvailabilityStatus,
   SaleOrderStatus,
   PaginatedSaleOrdersResponse,
-  SaleOrder
+  SaleOrder,
 } from '../models';
+import type { City } from '../enum/Common';
+import type { StaffRole } from '../models/Staff';
 import type { AxiosInstance } from 'axios';
 import { AxiosError } from 'axios';
 
@@ -59,13 +60,11 @@ export class InventoryService {
         searchBy = 'TITLE',
         warehouseCode,
         status,
-        role = 'store_manager'
+        role = 'ROLE_STORE_MANAGER' as StaffRole
       } = params;
 
-      // Use admin endpoint for the new API structure
       const endpoint = '/admin/inventory/stock';
 
-      // Build query parameters
       const queryParams: Record<string, string | number> = {
         page,
         size,
@@ -88,23 +87,19 @@ export class InventoryService {
         queryParams.status = status;
       }
 
-      // Backend returns BaseResponse with data as StockLevelResponse containing stockLevels and pagination
       const response = await this.apiFetcher.get<any>(endpoint, { 
         params: queryParams 
       });
       
-      // Check if there's an error code (BaseResponse structure)
       if (response.data.errorCode) {
         throw new Error(response.data.message || 'Failed to fetch stock levels');
       }
 
-      // Extract data from the Map structure
       const data = response.data.data;
       if (!data) {
         throw new Error(response.data.message || 'No data returned from server');
       }
 
-      // Backend returns: { data: { stockLevels: [...], pagination: {...} } }
       return {
         stockLevels: data.stockLevels || [],
         pagination: data.pagination || { currentPage: 1, pageSize: 20, totalResults: 0, totalPages: 0 }
@@ -122,26 +117,19 @@ export class InventoryService {
     }
   }
 
-  /**
-   * Adjust stock level with new quantity and reason
-   * @param stockLevelId the stock level ID to adjust
-   * @param request the adjustment request with newQuantity and reason
-   * @param role user role to determine endpoint (admin or store_manager)
-   * @returns updated stock level
-   */
   public async adjustStock(
     stockLevelId: number, 
     request: StockAdjustmentRequest,
-    role: 'admin' | 'store_manager' = 'store_manager'
-  ): Promise<StockLevel> {
+    role: StaffRole = 'ROLE_STORE_MANAGER'
+  ): Promise<string> {
     try {
       const endpoint = `/admin/inventory/stock/${stockLevelId}/adjust`;
       const response = await this.apiFetcher.put<any>(endpoint, request);
+      return response.data.message;
     } catch (error) {
       if (error instanceof AxiosError) {
         const errorMessage = 
-          (error.response?.data as any)?.error?.message ||
-          (error.response?.data as any)?.message ||
+          error.response?.data.message ||
           error.message ||
           'Failed to adjust stock. Please check your input and try again.';
         throw new Error(errorMessage);
@@ -150,11 +138,6 @@ export class InventoryService {
     }
   }
 
-  /**
-   * Get stock level details by ID
-   * @param id the stock level ID
-   * @returns stock level details
-   */
   public async getStockLevelById(id: number): Promise<StockLevel> {
     try {
       const endpoint = `/admin/inventory/stock/${id}`;

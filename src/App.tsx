@@ -93,7 +93,7 @@ const App = () => (
                   <Route 
                     path="/admin/inventory" 
                     element={
-                      <ProtectedRoute requiredRole={["ROLE_ADMIN", "ROLE_STORE_MANAGER", "ROLE_WAREHOUSE_MANAGER"]}>
+                      <ProtectedRoute requiredRole={["ROLE_ADMIN", "ROLE_STORE_MANAGER", "ROLE_WAREHOUSE_MANAGER", "ROLE_WAREHOUSE_STAFF"]}>
                         <InventoryManagement />
                       </ProtectedRoute>
                     } 

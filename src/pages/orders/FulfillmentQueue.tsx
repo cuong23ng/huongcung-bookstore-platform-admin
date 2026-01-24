@@ -134,20 +134,24 @@ export default function FulfillmentQueue() {
     }
   };
 
-  const getStatusBadgeVariant = (status: string): "default" | "secondary" | "destructive" | "outline" => {
+  const getStatusBadgeVariant = (status: string) => {
     switch (status) {
       case "PENDING":
         return "secondary";
-      case "PICKED_UP":
-      case "IN_TRANSIT":
-      case "OUT_FOR_DELIVERY":
-        return "default";
+      case "CONFIRMED":
+        return "cyan";
+      case "PROCESSING":
+        return "olive";
+      case "SHIPPED":
+        return "blue";
+      case "WAITING_PAYMENT":
+        return "yellow";
       case "DELIVERED":
         return "default";
-      case "FAILED_DELIVERY":
-      case "RETURNED":
+      case "COMPLETED":
+        return "green";
       case "CANCELLED":
-        return "destructive";
+        return "violet";
       default:
         return "outline";
     }
@@ -365,11 +369,7 @@ export default function FulfillmentQueue() {
                   <div>
                     <Label className="text-sm font-medium text-muted-foreground">Thanh toán</Label>
                     <div className="mt-1">
-                      {orderDetails.paymentStatus ? (
-                        <Badge variant={orderDetails.paymentStatus === 'PAID' ? 'default' : 'secondary'}>
-                          {orderDetails.paymentStatus === 'PAID' ? 'Đã thanh toán' : orderDetails.paymentStatus === 'PENDING' ? 'Chờ thanh toán' : 'Đã hoàn tiền'}
-                        </Badge>
-                      ) : '-'}
+                      {orderDetails.paymentMethod}
                     </div>
                   </div>
                 </div>
