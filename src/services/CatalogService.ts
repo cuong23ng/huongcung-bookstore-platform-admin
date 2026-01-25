@@ -11,7 +11,8 @@ import type {
   GetGenrePageResponse,
   GetPublisherPageResponse,
   GetTranslatorPageResponse,
-  BookDetail
+  BookDetail,
+  UploadResponse
 } from '../models';
 import type { AxiosInstance } from 'axios';
 import { AxiosError } from 'axios';
@@ -530,6 +531,75 @@ export class CatalogService {
       // If no errorCode, deletion was successful
     } catch (error) {
       throw this.handleError(error, 'Failed to delete genre');
+    }
+  }
+
+  public async prepareEbookFileUpload(bookId: number, fileName: string, contentType: string): Promise<UploadResponse> {
+    try {
+      const response = await this.apiFetcher.post<BaseResponse<UploadResponse>>(
+        `/admin/catalog/books/${bookId}/ebooks/files/prepare-upload`,
+        { fileName, contentType }
+      );
+      
+      if (response.data?.errorCode) {
+        throw new Error(response.data.message || 'Failed to prepare ebook file upload');
+      }
+      
+      if (response.data?.data) {
+        return response.data.data;
+      }
+      
+      throw new Error('Invalid response format from server');
+    } catch (error) {
+      throw this.handleError(error, 'Failed to prepare ebook file upload');
+    }
+  }
+
+  public async uploadFileToPresignedUrl(presignedUrl: string, file: File): Promise<void> {
+    try {
+      const response = await fetch(presignedUrl, {
+        method: 'PUT',
+        body: file,
+        headers: {
+          'Content-Type': file.type,
+        },
+        credentials: 'omit',
+      });
+      
+      if (!response.ok) {
+        throw new Error(`Failed to upload file: ${response.statusText}`);
+      }
+    } catch (error) {
+      throw this.handleError(error, 'Failed to upload file to presigned URL');
+    }
+  }
+
+  public async confirmEbookFileUpload(bookId: number, fileName: string, key: string): Promise<void> {
+    try {
+      const response = await this.apiFetcher.post<BaseResponse<null>>(
+        `/admin/catalog/books/${bookId}/ebooks/files/confirm`,
+        { fileName, key }
+      );
+      
+      if (response.data?.errorCode) {
+        throw new Error(response.data.message || 'Failed to confirm ebook file upload');
+      }
+    } catch (error) {
+      throw this.handleError(error, 'Failed to confirm ebook file upload');
+    }
+  }
+
+  public async deleteEbookFile(bookId: number, fileId: number): Promise<void> {
+    try {
+      const response = await this.apiFetcher.delete<BaseResponse<null>>(
+        `/admin/catalog/books/${bookId}/ebooks/files/${fileId}`
+      );
+      
+      if (response.data?.errorCode) {
+        throw new Error(response.data.message || 'Failed to delete ebook file');
+      }
+    } catch (error) {
+      throw this.handleError(error, 'Failed to delete ebook file');
     }
   }
 

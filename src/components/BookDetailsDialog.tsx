@@ -39,6 +39,8 @@ export function BookDetailsDialog({
   const [previewUrls, setPreviewUrls] = useState<string[]>([]);
   const [isEditingPhysicalBook, setIsEditingPhysicalBook] = useState(false);
   const [isEditingEbook, setIsEditingEbook] = useState(false);
+  const [selectedEbookFiles, setSelectedEbookFiles] = useState<File[]>([]);
+  const [uploadingEbookFiles, setUploadingEbookFiles] = useState<{ [key: string]: boolean }>({});
   
   // Physical book form state
   const [physicalBookForm, setPhysicalBookForm] = useState({
@@ -379,6 +381,67 @@ export function BookDetailsDialog({
     onError: (error: Error) => {
       toast({ 
         title: "Lỗi cập nhật trạng thái", 
+        description: error.message, 
+        variant: "destructive" 
+      });
+    },
+  });
+
+  const uploadEbookFileMutation = useMutation({
+    mutationFn: async ({ file }: { file: File }) => {
+      if (!bookId) throw new Error("Book ID is required");
+      
+      // Step 1: Prepare upload
+      const uploadResponse = await CatalogService.getInstance().prepareEbookFileUpload(
+        bookId,
+        file.name,
+        file.type
+      );
+      
+      // Step 2: Upload to presigned URL
+      await CatalogService.getInstance().uploadFileToPresignedUrl(
+        uploadResponse.uploadUrl,
+        file
+      );
+      
+      // Step 3: Confirm upload
+      await CatalogService.getInstance().confirmEbookFileUpload(
+        bookId,
+        file.name,
+        uploadResponse.key
+      );
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['bookDetails', bookId] });
+      setSelectedEbookFiles([]);
+      toast({ 
+        title: "Upload ebook file thành công", 
+        description: "File đã được tải lên thành công",
+      });
+    },
+    onError: (error: Error) => {
+      toast({ 
+        title: "Lỗi upload ebook file", 
+        description: error.message, 
+        variant: "destructive" 
+      });
+    },
+  });
+
+  const deleteEbookFileMutation = useMutation({
+    mutationFn: (fileId: number) => bookId 
+      ? CatalogService.getInstance().deleteEbookFile(bookId, fileId)
+      : Promise.reject(new Error("Book ID is required")),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['bookDetails', bookId] });
+      toast({ 
+        title: "Xóa ebook file thành công", 
+        description: "File đã được xóa thành công",
+      });
+    },
+    onError: (error: Error) => {
+      toast({ 
+        title: "Lỗi xóa ebook file", 
         description: error.message, 
         variant: "destructive" 
       });
@@ -789,25 +852,169 @@ export function BookDetailsDialog({
                 </Button>
               </div>
               {bookDetails.ebookInfo && (
-                <div className="grid grid-cols-2 gap-4">
-                  {bookDetails.ebookInfo.isbn && (
-                    <div>
-                      <p className="text-sm font-medium text-muted-foreground">E-ISBN</p>
-                      <p className="text-sm">{bookDetails.ebookInfo.isbn}</p>
+                <div>
+                  <div className="grid grid-cols-2 gap-4">
+                    {bookDetails.ebookInfo.isbn && (
+                      <div>
+                        <p className="text-sm font-medium text-muted-foreground">E-ISBN</p>
+                        <p className="text-sm">{bookDetails.ebookInfo.isbn}</p>
+                      </div>
+                    )}
+                    {bookDetails.ebookInfo.publicationDate && (
+                      <div>
+                        <p className="text-sm font-medium text-muted-foreground">Ngày xuất bản</p>
+                        <p className="text-sm">{new Date(bookDetails.ebookInfo.publicationDate).toLocaleDateString('vi-VN')}</p>
+                      </div>
+                    )}
+                    {bookDetails.ebookInfo.currentPrice && (
+                      <div>
+                        <p className="text-sm font-medium text-muted-foreground">Giá</p>
+                        <p className="text-sm font-medium">{bookDetails.ebookInfo.currentPrice.toLocaleString('vi-VN')} VNĐ</p>
+                      </div>
+                    )}
+                  </div>
+                  <div className="flex items-center justify-between mb-3 mt-6">
+                    <h4 className="text-sm font-medium text-muted-foreground">Ebook Files</h4>
+                    <div className="flex items-center gap-2">
+                      <Input
+                        type="file"
+                        accept=".pdf,.epub,.mobi,.azw,.azw3"
+                        className="hidden"
+                        id="upload-ebook-file"
+                        onChange={(e) => {
+                          const files = Array.from(e.target.files || []);
+                          if (files.length > 0) {
+                            const file = files[0];
+                            // Validate file size (max 100MB)
+                            if (file.size > 100 * 1024 * 1024) {
+                              toast({
+                                title: "Lỗi",
+                                description: "File quá lớn. Kích thước tối đa là 100MB",
+                                variant: "destructive",
+                              });
+                              return;
+                            }
+                            setSelectedEbookFiles([file]);
+                          }
+                        }}
+                      />
+                      <Label htmlFor="upload-ebook-file" className="cursor-pointer">
+                        <Button
+                          type="button"
+                          variant="ghost"
+                          size="sm"
+                          asChild
+                          disabled={uploadEbookFileMutation.isPending}
+                          className="border-0"
+                        >
+                          <span>
+                            <Upload className="h-4 w-4 mr-2" />
+                          </span>
+                        </Button>
+                      </Label>
+                      {selectedEbookFiles.length > 0 && (
+                        <Button
+                          type="button"
+                          variant="default"
+                          size="sm"
+                          onClick={() => {
+                            const file = selectedEbookFiles[0];
+                            setUploadingEbookFiles(prev => ({ ...prev, [file.name]: true }));
+                            uploadEbookFileMutation.mutate(
+                              { file },
+                              {
+                                onSettled: () => {
+                                  setUploadingEbookFiles(prev => {
+                                    const newState = { ...prev };
+                                    delete newState[file.name];
+                                    return newState;
+                                  });
+                                },
+                              }
+                            );
+                          }}
+                          disabled={uploadEbookFileMutation.isPending}
+                        >
+                          {uploadEbookFileMutation.isPending ? (
+                            <>
+                              <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                              Đang upload...
+                            </>
+                          ) : (
+                            "Upload"
+                          )}
+                        </Button>
+                      )}
                     </div>
-                  )}
-                  {bookDetails.ebookInfo.publicationDate && (
-                    <div>
-                      <p className="text-sm font-medium text-muted-foreground">Ngày xuất bản</p>
-                      <p className="text-sm">{new Date(bookDetails.ebookInfo.publicationDate).toLocaleDateString('vi-VN')}</p>
-                    </div>
-                  )}
-                  {bookDetails.ebookInfo.currentPrice && (
-                    <div>
-                      <p className="text-sm font-medium text-muted-foreground">Giá</p>
-                      <p className="text-sm font-medium">{bookDetails.ebookInfo.currentPrice.toLocaleString('vi-VN')} VNĐ</p>
-                    </div>
-                  )}
+                  </div>
+                  <div className="space-y-2">
+                    {/* Existing ebook files */}
+                    {bookDetails.ebookInfo.files && bookDetails.ebookInfo.files.length > 0 && (
+                      <>
+                        {bookDetails.ebookInfo.files.map((file) => (
+                          <div key={file.id} className="flex items-center justify-between p-3 border rounded-md group">
+                            <div className="flex items-center gap-3">
+                              <BookOpen className="h-5 w-5 text-muted-foreground" />
+                              <div>
+                                <p className="text-sm font-medium">{file.fileName}</p>
+                                {file.downloadCount !== undefined && (
+                                  <p className="text-xs text-muted-foreground">
+                                    Đã tải: {file.downloadCount} lần
+                                  </p>
+                                )}
+                              </div>
+                            </div>
+                            <Button
+                              type="button"
+                              variant="ghost"
+                              size="icon"
+                              className="h-8 w-8 opacity-0 group-hover:opacity-100 transition-opacity"
+                              onClick={() => {
+                                if (confirm('Bạn có chắc chắn muốn xóa file này?')) {
+                                  deleteEbookFileMutation.mutate(file.id);
+                                }
+                              }}
+                              disabled={deleteEbookFileMutation.isPending}
+                            >
+                              {deleteEbookFileMutation.isPending ? (
+                                <Loader2 className="h-4 w-4 animate-spin" />
+                              ) : (
+                                <X className="h-4 w-4" />
+                              )}
+                            </Button>
+                          </div>
+                        ))}
+                      </>
+                    )}
+                    {/* Preview selected file */}
+                    {selectedEbookFiles.map((file, index) => (
+                      <div key={`preview-${index}`} className="flex items-center justify-between p-3 border rounded-md bg-muted/50">
+                        <div className="flex items-center gap-3">
+                          <BookOpen className="h-5 w-5 text-muted-foreground" />
+                          <div>
+                            <p className="text-sm font-medium">{file.name}</p>
+                            <p className="text-xs text-muted-foreground">
+                              {(file.size / 1024 / 1024).toFixed(2)} MB
+                            </p>
+                          </div>
+                        </div>
+                        <Button
+                          type="button"
+                          variant="ghost"
+                          size="icon"
+                          className="h-8 w-8"
+                          onClick={() => {
+                            setSelectedEbookFiles([]);
+                          }}
+                        >
+                          <X className="h-4 w-4" />
+                        </Button>
+                      </div>
+                    ))}
+                    {(!bookDetails.ebookInfo.files || bookDetails.ebookInfo.files.length === 0) && selectedEbookFiles.length === 0 && (
+                      <p className="text-sm text-muted-foreground">Chưa có ebook file nào. Hãy tải lên file cho cuốn sách này.</p>
+                    )}
+                  </div>
                 </div>
               )}
               {!bookDetails.ebookInfo && (

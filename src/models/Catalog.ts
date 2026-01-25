@@ -206,10 +206,26 @@ export interface PhysicalBookInformation {
   lengthCm?: number;
 }
 
+export interface EbookFile {
+  id: number;
+  fileName: string;
+  fileType?: string;
+  url: string;
+  downloadCount?: number;
+  createdAt?: string;
+}
+
+export interface UploadResponse {
+  id?: number;
+  key: string;
+  uploadUrl: string;
+}
+
 export interface EbookInformation {
   isbn?: string;
   publicationDate?: string;
   currentPrice?: number;
+  files?: EbookFile[];
 }
 
 export interface BookDetail {
