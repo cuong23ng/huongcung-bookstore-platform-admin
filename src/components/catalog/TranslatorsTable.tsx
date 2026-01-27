@@ -1,21 +1,25 @@
 import { Button } from "../ui/button";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "../ui/table";
 import { Trash2 } from "lucide-react";
-import type { Author } from "../../models";
+import type { Translator } from "../../models";
 
-interface AuthorsTableProps {
-  readonly authors: Author[];
+interface TranslatorsTableProps {
+  readonly translators: Translator[];
   readonly isLoading: boolean;
   readonly error: Error | null;
-  readonly onDelete: (authorId: number, authorName: string) => void;
+  readonly onDelete: (translatorId: number, translatorName: string) => void;
 }
 
-export function AuthorsTable({
-  authors,
+const formatDate = (dateStr: string): string => {
+  return dateStr.split('T')[0];
+};
+
+export function TranslatorsTable({
+  translators,
   isLoading,
   error,
   onDelete,
-}: AuthorsTableProps) {
+}: TranslatorsTableProps) {
   if (isLoading) {
     return <div className="text-center py-8">Đang tải...</div>;
   }
@@ -23,16 +27,16 @@ export function AuthorsTable({
   if (error) {
     return (
       <div className="text-center py-8">
-        <p className="text-destructive">Lỗi tải danh sách tác giả</p>
+        <p className="text-destructive">Lỗi tải danh sách dịch giả</p>
         <p className="text-sm text-muted-foreground mt-2">{error.message}</p>
       </div>
     );
   }
 
-  if (authors.length === 0) {
+  if (translators.length === 0) {
     return (
       <div className="text-center py-8">
-        <p className="text-muted-foreground">Chưa có tác giả nào</p>
+        <p className="text-muted-foreground">Chưa có dịch giả nào</p>
       </div>
     );
   }
@@ -43,23 +47,23 @@ export function AuthorsTable({
         <TableRow>
           <TableHead>Tên</TableHead>
           <TableHead>Tiểu sử</TableHead>
-          <TableHead>Quốc tịch</TableHead>
+          <TableHead>Ngày sinh</TableHead>
           <TableHead className="text-right">Thao tác</TableHead>
         </TableRow>
       </TableHeader>
       <TableBody>
-        {authors.map((author) => (
-          <TableRow key={author.id}>
-            <TableCell className="font-medium">{author.name || '-'}</TableCell>
+        {translators.map((translator) => (
+          <TableRow key={translator.id}>
+            <TableCell className="font-medium">{translator.name || '-'}</TableCell>
             <TableCell className="max-w-md truncate">
-              {author.bio || "-"}
+              {translator.biography || translator.bio || "-"}
             </TableCell>
-            <TableCell>{author.nationality || "-"}</TableCell>
+            <TableCell>{formatDate(translator.birthDate) || "-"}</TableCell>
             <TableCell className="text-right">
               <Button
                 variant="ghost"
                 size="sm"
-                onClick={() => onDelete(author.id, author.name)}
+                onClick={() => onDelete(translator.id, translator.name)}
               >
                 <Trash2 className="h-4 w-4 text-destructive" />
               </Button>

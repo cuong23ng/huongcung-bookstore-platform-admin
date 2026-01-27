@@ -119,21 +119,29 @@ export interface Translator {
   id: number;
   name: string;
   bio?: string;
-  nationality?: string;
+  biography?: string;
+  birthDate?: string;
+  image?: {
+    id?: number;
+    url?: string;
+    fileName?: string;
+  };
   createdAt?: string;
   updatedAt?: string;
 }
 
 export interface CreateTranslatorRequest {
   name: string;
-  bio?: string;
-  nationality?: string;
+  biography?: string;
+  birthDate?: string;
+  image?: ImageData;
 }
 
 export interface UpdateTranslatorRequest {
   name?: string;
-  bio?: string;
-  nationality?: string;
+  biography?: string;
+  birthDate?: string;
+  photoUrl?: string;
 }
 
 export interface Publisher {

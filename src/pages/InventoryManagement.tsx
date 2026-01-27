@@ -879,9 +879,6 @@ export default function InventoryManagement() {
                               placeholder="Nhập số lượng thêm mới"
                           required
                         />
-                        <p className="text-xs text-muted-foreground">
-                              Số lượng sách mới nhập kho (số dương)
-                        </p>
                       </div>
                           {quantityToAdd && !Number.isNaN(Number.parseInt(quantityToAdd, 10)) && (
                             <div className="space-y-2 p-3 rounded-lg border bg-muted/50">
@@ -909,7 +906,7 @@ export default function InventoryManagement() {
                           required
                         />
                         <p className="text-xs text-muted-foreground">
-                              {adjustReason.length}/1000 ký tự. Lý do sẽ được ghi lại trong nhật ký kiểm toán.
+                              {adjustReason.length}/1000 ký tự.
                         </p>
                       </div>
                           <div className="flex gap-2 pt-2">

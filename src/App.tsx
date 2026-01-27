@@ -14,12 +14,12 @@ import StaffManagement from "./pages/StaffManagement";
 import BooksManagement from "./pages/catalog/BooksManagement";
 import AuthorsManagement from "./pages/catalog/AuthorsManagement";
 import GenresManagement from "./pages/catalog/GenresManagement";
+import TranslatorsManagement from "./pages/catalog/TranslatorsManagement";
 import InventoryManagement from "./pages/InventoryManagement";
 import FulfillmentQueue from "./pages/orders/FulfillmentQueue";
 import AllOrders from "./pages/orders/AllOrders";
 import CreatedConsignments from "./pages/consignments/CreatedConsignments";
 import AllConsignments from "./pages/consignments/AllConsignments";
-import CustomerSupport from "./pages/CustomerSupport";
 
 const queryClient = new QueryClient();
 
@@ -87,6 +87,14 @@ const App = () => (
                     element={
                       <ProtectedRoute requiredRole={["ROLE_ADMIN", "ROLE_SUPPORT_AGENT"]}>
                         <GenresManagement />
+                      </ProtectedRoute>
+                    } 
+                  />
+                  <Route 
+                    path="/admin/catalog/translators" 
+                    element={
+                      <ProtectedRoute requiredRole={["ROLE_ADMIN", "ROLE_SUPPORT_AGENT"]}>
+                        <TranslatorsManagement />
                       </ProtectedRoute>
                     } 
                   />

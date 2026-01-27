@@ -62,6 +62,7 @@ export function AppSidebar() {
     { title: "Sách", url: "/admin/catalog/books" },
     { title: "Tác giả", url: "/admin/catalog/authors" },
     { title: "Thể loại", url: "/admin/catalog/genres" },
+    { title: "Dịch giả", url: "/admin/catalog/translators" },
   ];
 
   // Orders submenu items

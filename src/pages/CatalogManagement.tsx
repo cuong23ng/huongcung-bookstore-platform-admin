@@ -8,15 +8,17 @@ import { BookDetailsDialog } from "../components/BookDetailsDialog";
 import { BooksTable } from "../components/catalog/BooksTable";
 import { AuthorsTable } from "../components/catalog/AuthorsTable";
 import { GenresTable } from "../components/catalog/GenresTable";
+import { TranslatorsTable } from "../components/catalog/TranslatorsTable";
 import { BookFormDialog } from "../components/catalog/BookFormDialog";
 import { AuthorFormDialog } from "../components/catalog/AuthorFormDialog";
 import { GenreFormDialog } from "../components/catalog/GenreFormDialog";
+import { TranslatorFormDialog } from "../components/catalog/TranslatorFormDialog";
 import { useToast } from "../hooks/use-toast";
 import { ArrowLeft } from "lucide-react";
 import { CatalogService } from "../services/CatalogService";
 import { getAuthData } from "../services/AdminAuthService";
 import { Header } from "../components/Header";
-import type { CreateBookRequest, Book, Author, Genre, Publisher, Translator, BookImageData, CreateAuthorRequest, CreateGenreRequest, ImageData } from "../models";
+import type { CreateBookRequest, Book, Author, Genre, Publisher, Translator, BookImageData, CreateAuthorRequest, CreateGenreRequest, CreateTranslatorRequest, ImageData } from "../models";
 
 export default function CatalogManagement() {
   const navigate = useNavigate();
@@ -26,6 +28,7 @@ export default function CatalogManagement() {
   const [dialogOpen, setDialogOpen] = useState(false);
   const [authorDialogOpen, setAuthorDialogOpen] = useState(false);
   const [genreDialogOpen, setGenreDialogOpen] = useState(false);
+  const [translatorDialogOpen, setTranslatorDialogOpen] = useState(false);
   const [bookDetailsDialogOpen, setBookDetailsDialogOpen] = useState(false);
   const [selectedBookId, setSelectedBookId] = useState<number | null>(null);
   const [selectedImages, setSelectedImages] = useState<File[]>([]);
@@ -46,6 +49,15 @@ export default function CatalogManagement() {
     name: "",
     description: "",
   });
+  
+  // Translator form state
+  const [translatorFormData, setTranslatorFormData] = useState<Partial<CreateTranslatorRequest>>({
+    name: "",
+    biography: "",
+    birthDate: "",
+  });
+  const [translatorAvatar, setTranslatorAvatar] = useState<File | null>(null);
+  const [translatorAvatarPreview, setTranslatorAvatarPreview] = useState<string | null>(null);
   
   // Form state
   const [formData, setFormData] = useState<Partial<CreateBookRequest>>({
@@ -156,12 +168,22 @@ export default function CatalogManagement() {
     enabled: activeTab === 'books' && dialogOpen, // Only load when book form dialog is open
   });
 
-  // Translators (only needed for book form)
-  const { data: translators = [], isLoading: isLoadingTranslators } = useQuery({
+  // Translators
+  const { data: translators = [], isLoading: isLoadingTranslators, error: translatorsError, refetch: refetchTranslators } = useQuery({
     queryKey: ['translators'],
     queryFn: () => CatalogService.getInstance().getAllTranslators(),
-    enabled: activeTab === 'books' && dialogOpen,
+    enabled: activeTab === 'translators' || (activeTab === 'books' && dialogOpen),
   });
+
+  useEffect(() => {
+    if (translatorsError && !isLoadingTranslators) {
+      toast({ 
+        title: "Lỗi tải danh sách dịch giả", 
+        description: translatorsError instanceof Error ? translatorsError.message : "Có lỗi xảy ra", 
+        variant: "destructive" 
+      });
+    }
+  }, [translatorsError, isLoadingTranslators, toast]);
 
   // Delete mutations
   const deleteBookMutation = useMutation({
@@ -309,6 +331,27 @@ export default function CatalogManagement() {
     },
     onError: (error: Error) => {
       toast({ title: "Lỗi thêm thể loại", description: error.message, variant: "destructive" });
+    },
+  });
+
+  // Create translator mutation
+  const createTranslatorMutation = useMutation({
+    mutationFn: (data: CreateTranslatorRequest) => CatalogService.getInstance().createTranslator(data),
+    onSuccess: async () => {
+      await queryClient.invalidateQueries({ queryKey: ['translators'] });
+      await refetchTranslators();
+      toast({ title: "Thêm dịch giả thành công" });
+      setTranslatorDialogOpen(false);
+      setTranslatorFormData({
+        name: "",
+        biography: "",
+        birthDate: "",
+      });
+      setTranslatorAvatar(null);
+      setTranslatorAvatarPreview(null);
+    },
+    onError: (error: Error) => {
+      toast({ title: "Lỗi thêm dịch giả", description: error.message, variant: "destructive" });
     },
   });
 
@@ -558,6 +601,72 @@ export default function CatalogManagement() {
     createGenreMutation.mutate(requestData);
   };
 
+  const handleTranslatorAvatarSelect = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    if (!file.type.startsWith('image/')) {
+      toast({ 
+        title: "Lỗi", 
+        description: "Vui lòng chọn file ảnh hợp lệ", 
+        variant: "destructive" 
+      });
+      return;
+    }
+
+    setTranslatorAvatar(file);
+
+    // Create preview
+    const reader = new FileReader();
+    reader.onload = (e) => {
+      setTranslatorAvatarPreview(e.target?.result as string);
+    };
+    reader.readAsDataURL(file);
+  };
+
+  const removeTranslatorAvatar = () => {
+    setTranslatorAvatar(null);
+    setTranslatorAvatarPreview(null);
+  };
+
+  const handleTranslatorSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    
+    if (!translatorFormData.name || !translatorFormData.name.trim()) {
+      toast({ title: "Lỗi", description: "Vui lòng nhập tên dịch giả", variant: "destructive" });
+      return;
+    }
+
+    // Convert avatar to base64 if provided
+    let imageData: ImageData | undefined = undefined;
+    if (translatorAvatar) {
+      try {
+        const base64Data = await convertFileToBase64(translatorAvatar);
+        imageData = {
+          fileName: translatorAvatar.name,
+          fileType: translatorAvatar.type,
+          base64Data: base64Data,
+        };
+      } catch (error) {
+        toast({ 
+          title: "Lỗi", 
+          description: "Không thể chuyển đổi ảnh sang base64", 
+          variant: "destructive" 
+        });
+        return;
+      }
+    }
+
+    const requestData: CreateTranslatorRequest = {
+      name: translatorFormData.name.trim(),
+      biography: translatorFormData.biography?.trim() || undefined,
+      birthDate: translatorFormData.birthDate || undefined,
+      image: imageData,
+    };
+
+    createTranslatorMutation.mutate(requestData);
+  };
+
   return (
     <div className="min-h-screen bg-background">
       {/* <header className="border-b bg-card">
@@ -583,6 +692,7 @@ export default function CatalogManagement() {
                   <TabsTrigger value="books">Sách</TabsTrigger>
                   <TabsTrigger value="authors">Tác giả</TabsTrigger>
                   <TabsTrigger value="genres">Thể loại</TabsTrigger>
+                  <TabsTrigger value="translators">Dịch giả</TabsTrigger>
                 </TabsList>
 
                 <TabsContent value="books" className="mt-4">
@@ -659,6 +769,29 @@ export default function CatalogManagement() {
                   isLoading={isLoadingGenres}
                   error={genresError}
                   onDelete={(genreId, genreName) => handleDelete("genre", genreId, genreName)}
+                />
+              </TabsContent>
+
+              <TabsContent value="translators" className="mt-4">
+                <div className="flex justify-end mb-4">
+                  <TranslatorFormDialog
+                    open={translatorDialogOpen}
+                    onOpenChange={setTranslatorDialogOpen}
+                    formData={translatorFormData}
+                    onFormDataChange={setTranslatorFormData}
+                    avatar={translatorAvatar}
+                    avatarPreview={translatorAvatarPreview}
+                    onAvatarSelect={handleTranslatorAvatarSelect}
+                    onAvatarRemove={removeTranslatorAvatar}
+                    onSubmit={handleTranslatorSubmit}
+                    isSubmitting={createTranslatorMutation.isPending}
+                          />
+                        </div>
+                <TranslatorsTable
+                  translators={translators as Translator[]}
+                  isLoading={isLoadingTranslators}
+                  error={translatorsError}
+                  onDelete={(translatorId, translatorName) => handleDelete("translator", translatorId, translatorName)}
                 />
               </TabsContent>
             </Tabs>
